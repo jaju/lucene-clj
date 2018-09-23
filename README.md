@@ -2,6 +2,10 @@
 
 A Clojure wrapper for Apache Lucene
 
+## What?
+
+This is to scratch an itch, and is inspired by other example wrappers I've come across.
+
 ## Usage
 
 TBD
