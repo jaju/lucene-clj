@@ -12,6 +12,6 @@
                 (rest csv-stream))))
 
 (comment
-  (def mem-dir (lucene/create-memory-index))
-  (lucene/index-all! mem-dir test-doc-maps {})
+  (def mem-dir (lucene/memory-index>))
+  (lucene/index-all! mem-dir test-doc-maps {:suggest-fields {:first-name 5}})
   (lucene/search mem-dir "suppandi" {:field-name "first-name"}))

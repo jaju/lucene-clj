@@ -10,7 +10,8 @@
            [java.util.logging Logger Level]
            [clojure.lang Sequential]
            [org.apache.lucene.util QueryBuilder]
-           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]))
+           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
+           [org.apache.lucene.search.suggest.document SuggestField]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
 
@@ -59,26 +60,40 @@
       (.setStored stored?))))
 
 (defn- ^Field field> [key value opts]
-  ""
+  {:pre [(not (.startsWith (name key) "$suggest"))]}
   (let [^FieldType field-type (field-type> opts)
         value                 (if (keyword? value) (name value) (str value))]
     (Field. ^String (name key) ^String value field-type)))
 
+(defn- ^SuggestField suggest-field>
+  ([key value weight]
+   (let [key (str "$suggest-" (name key))]
+     (.log logger Level/FINEST (str "Created suggest field with name " key " and value " value))
+     (SuggestField. key value weight))))
 
-(defn map->document [m {:keys [stored-fields indexed-fields]}]
+(defonce -docs (atom []))
+(defn map->document [m {:keys [stored-fields indexed-fields suggest-fields]}]
   "Convert a map to a Lucene document.
   Lossy on the way back. String field names come back as keywords."
-  (let [stored-fields    (or stored-fields (->> m keys (into #{})))
-        indexed-fields   (or indexed-fields (zipmap (keys m) (repeat :full)))
-        field-keys       (keys m)
-        field-creator-fn (fn [k]
-                           (field> k (get m k)
-                                   {:index-type (get indexed-fields k false)
-                                    :stored?    (contains? stored-fields k)}))
-        fields           (map field-creator-fn field-keys)
-        doc              (Document.)]
+  (let [stored-fields            (or stored-fields (->> m keys (into #{})))
+        indexed-fields           (or indexed-fields (zipmap (keys m) (repeat :full)))
+        suggest-fields           (or suggest-fields {})
+        field-keys               (keys m)
+        field-creator-fn         (fn [k]
+                                   (field> k (get m k)
+                                           {:index-type (get indexed-fields k false)
+                                            :stored?    (contains? stored-fields k)}))
+        suggest-field-creator-fn (fn [[field-name weight]]
+                                   (let [value (get m field-name)]
+                                     (suggest-field> field-name value weight)))
+        fields                   (map field-creator-fn field-keys)
+        suggest-fields           (map suggest-field-creator-fn suggest-fields)
+        doc                      (Document.)]
     (doseq [^Field field fields]
       (.add doc field))
+    (doseq [^SuggestField field suggest-fields]
+      (.add doc field))
+    (swap! -docs conj doc)
     doc))
 
 (defn document->map [^Document document]
@@ -90,6 +105,47 @@
     {}
     document))
 
+(defn ^Directory memory-index>
+  "Lucene Directory for transient indexes"
+  []
+  (RAMDirectory.))
+
+(defn ^Directory disk-index>
+  "Persistent index on disk"
+  [^String dir-path]
+  (let [path (.toPath ^File (io/as-file dir-path))]
+    (FSDirectory/open path)))
+
+(defmulti index-all! (fn [store & _] (class store)))
+
+(defmethod index-all! Directory
+  [^Directory directory
+   ^Sequential map-docs
+   {:keys [analyzer]
+    :or   {analyzer (*analyzer>*)}
+    :as   opts}]
+  (let [index-writer-config (index-writer-config> analyzer)
+        index-writer        (index-writer> directory index-writer-config)]
+    (try
+      (index-all! index-writer map-docs (dissoc opts :analyzer))
+      (.commit index-writer)
+      (catch Exception e
+        (.log logger Level/SEVERE
+              (str *ns* " - Error in IO with index writer - " (.getMessage e))))
+      (finally
+        (.close index-writer)))))
+
+(defmethod index-all! IndexWriter
+  [^IndexWriter index-writer
+   map-docs
+   {:keys [stored-fields indexed-fields suggest-fields]
+    :as   opts}]
+  (doseq [document (map
+                     #(map->document %
+                                     {:stored-fields  stored-fields
+                                      :indexed-fields indexed-fields
+                                      :suggest-fields suggest-fields}) map-docs)]
+    (.addDocument index-writer document)))
 
 ;; Picked from https://github.com/federkasten/clucie
 (defmulti ^:private search* #(class (first %&)))
@@ -134,41 +190,3 @@
 
 (defn search [store query-form opts]
   (search* store :query query-form opts))
-
-(defn ^Directory create-memory-index
-  "Lucene Directory for transient indexes"
-  []
-  (RAMDirectory.))
-
-(defn ^Directory create-disk-index
-  "Persistent index on disk"
-  [^String dir-path]
-  (let [path (.toPath ^File (io/as-file dir-path))]
-    (FSDirectory/open path)))
-
-(defmulti index-all! (fn [store & _] (class store)))
-
-(defmethod index-all! Directory
-  [^Directory directory
-   ^Sequential map-docs
-   {:keys [analyzer]
-    :or   {analyzer (*analyzer>*)}
-    :as   opts}]
-  (let [index-writer-config (index-writer-config> analyzer)
-        index-writer        (index-writer> directory index-writer-config)]
-    (try
-      (index-all! index-writer map-docs (dissoc opts :analyzer))
-      (.commit index-writer)
-      (catch Exception e
-        (.log logger Level/SEVERE
-              (str *ns* " - Error in IO with index writer - " (.getMessage e))))
-      (finally
-        (.close index-writer)))))
-
-(defmethod index-all! IndexWriter
-  [^IndexWriter index-writer
-   map-docs
-   {:keys [stored-fields indexed-fields]
-    :as   opts}]
-  (doseq [document (map #(map->document % {:stored-fields stored-fields :indexed-fields indexed-fields}) map-docs)]
-    (.addDocument index-writer document)))

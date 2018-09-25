@@ -12,7 +12,7 @@
                                  (map keyword)
                                  repeat)
                             (rest csv-coll))
-      directory        (create-memory-index)
+      directory        (memory-index>)
       analyzer         (*analyzer>*)
       _                (index-all! directory data {})]
 
