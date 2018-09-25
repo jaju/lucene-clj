@@ -4,11 +4,14 @@ A Clojure wrapper for Apache Lucene
 
 ## What?
 
-This is to scratch an itch, and is inspired by other example wrappers I've come across.
+Inspired by other example wrappers I've come across.
+Notably
+ - https://github.com/federkasten/clucie
+ - https://github.com/weavejester/clucy
 
 ## Usage
 
-TBD
+TBD. Some samples to look at in the tests.
 
 ## License
 

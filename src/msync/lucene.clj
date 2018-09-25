@@ -1,5 +1,6 @@
 (ns msync.lucene
-  (:require [clojure.java.io :as io])
+  (:require [clojure.java.io :as io]
+            [msync.lucene.query :as query])
   (:import [org.apache.lucene.store RAMDirectory Directory FSDirectory]
            [org.apache.lucene.analysis CharArraySet Analyzer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
@@ -160,20 +161,7 @@
                                       :suggest-fields suggest-fields}) map-docs)]
     (.addDocument index-writer document)))
 
-;; Picked from https://github.com/federkasten/clucie
-(defmulti ^:private parse-query
-          (fn [_ {:keys [query-type]}] query-type))
-
-(defmethod parse-query :query
-  [query-form {:keys [analyzer field-name]}]
-  (let [^QueryBuilder q-builder (QueryBuilder. analyzer)]
-    (.createBooleanQuery q-builder (name field-name) query-form)))
-
-(defmethod parse-query :phrase-query
-  [query-form {:keys [analyzer field-name]}]
-  (let [^QueryBuilder q-builder (QueryBuilder. analyzer)]
-    (.createPhraseQuery q-builder (name field-name) query-form)))
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti ^:private search* #(class (first %&)))
 
 (defmethod search* Directory
@@ -189,7 +177,7 @@
            page             0
            analyzer         (*>analyzer*)}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
-        ^Query query            (parse-query query-form {:analyzer analyzer :query-type query-type :field-name field-name})
+        ^Query query            (query/parse-query query-form {:analyzer analyzer :query-type query-type :field-name field-name})
         ^TopDocs hits           (.search searcher query (int max-results))
         start                   (* page results-per-page)
         end                     (min (+ start results-per-page) max-results (.totalHits hits))]
@@ -202,16 +190,21 @@
               score   (.score hit)]
           {:hit doc-map :score score :doc-id doc-id})))))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn search [store query-form opts]
   (search* store :query query-form opts))
+
 (defn phrase-search [store query-form opts]
   (search* store :phrase-query query-form opts))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti suggest #(class (first %&)))
+
 (defmethod suggest Directory
   [directory field prefix-query opts]
   (with-open [reader (>index-reader directory)]
     (suggest reader field prefix-query opts)))
+
 (defmethod suggest IndexReader
   [reader field prefix-query {:keys [analyzer num-hits]}]
   (let [suggest-field        (str suggest-field-prefix (name field))

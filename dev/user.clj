@@ -14,7 +14,7 @@
                      repeat)
                 (rest csv-stream))))
 
-(defn filter-codec> []
+(defn >filter-codec []
   (proxy
     [Lucene70Codec] []
 
@@ -25,7 +25,7 @@
 
 (defn comp-iw-config> []
   (let [c (#'lucene/>index-writer-config)]
-    (.setCodec c (filter-codec>))
+    (.setCodec c (>filter-codec))
     c))
 
 (comment
