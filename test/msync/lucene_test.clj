@@ -35,5 +35,9 @@
   (deftest suggestions
     (testing "suggest first names"
       (is (= 3 (count (lucene/suggest directory :first-name "S" {}))))
-      (is (= 1 (count (lucene/suggest directory :first-name "Cha" {})))))))
+      (is (= 1 (count (lucene/suggest directory :first-name "Cha" {}))))))
+
+  (deftest or-search-with-set
+    (testing "test an OR set"
+      (is (= 2 (count (lucene/search directory #{"Shambhu" "Jupiterwala"} {:field-name "last-name"})))))))
 
