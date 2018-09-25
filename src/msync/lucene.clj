@@ -33,7 +33,7 @@
   ([^Collection stop-words] (>standard-analyzer stop-words true))
   ([^Collection stop-words ^Boolean ignore-case?] (StandardAnalyzer. (CharArraySet. stop-words ignore-case?))))
 
-(def ^:dynamic *analyzer>* >standard-analyzer)
+(def ^:dynamic *>analyzer* >standard-analyzer)
 (def ^:private suggest-field-prefix "$suggest-")
 
 (defn- >filter-codec-for-suggestiions []
@@ -46,7 +46,7 @@
 
 (defn- >index-writer-config
   ([]
-   (>index-writer-config (*analyzer>*)))
+   (>index-writer-config (*>analyzer*)))
   ([^Analyzer analyzer]
    (let [config (IndexWriterConfig. analyzer)]
      (.setCodec config (>filter-codec-for-suggestiions))
@@ -135,7 +135,7 @@
   [^Directory directory
    ^Sequential map-docs
    {:keys [analyzer]
-    :or   {analyzer (*analyzer>*)}
+    :or   {analyzer (*>analyzer*)}
     :as   opts}]
   (let [index-writer-config (>index-writer-config analyzer)
         index-writer        (>index-writer directory index-writer-config)]
@@ -187,7 +187,7 @@
     :or   {results-per-page 10
            max-results      results-per-page
            page             0
-           analyzer         (*analyzer>*)}}]
+           analyzer         (*>analyzer*)}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
         ^Query query            (parse-query query-form {:analyzer analyzer :query-type query-type :field-name field-name})
         ^TopDocs hits           (.search searcher query (int max-results))
@@ -216,7 +216,7 @@
   [reader field prefix-query {:keys [analyzer num-hits]}]
   (let [suggest-field        (str suggest-field-prefix (name field))
         term                 (Term. suggest-field prefix-query)
-        analyzer             (or analyzer (*analyzer>*))
+        analyzer             (or analyzer (*>analyzer*))
         pcq                  (PrefixCompletionQuery. analyzer term)
         suggester            (SuggestIndexSearcher. reader)
         num-hits             (min 10 (or num-hits 10))
