@@ -1,6 +1,6 @@
 (ns msync.lucene.query
   (:import
-    [org.apache.lucene.search Query BooleanQuery BooleanQuery$Builder BooleanClause$Occur BooleanClause]
+    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur BooleanClause]
     [clojure.lang Sequential IPersistentSet IPersistentMap]
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]))
@@ -32,11 +32,13 @@
   IPersistentMap
   (parse-expression [m opts]
     (let [qb (BooleanQuery$Builder.)]
-      (doseq [q (keep (fn [[k v]] (parse-expression v (assoc opts :key k))) m)]
-        (.add qb q BooleanClause$Occur/MUST))))
+      (doseq [q (keep (fn [[k v]] (parse-expression v (assoc opts :field-name (name k)))) m)]
+        (.add qb q BooleanClause$Occur/MUST))
+      (.build qb)))
 
   String
   (parse-expression [str-query {:keys [^Analyzer analyzer field-name query-type] :as opts}]
+    {:pre [(not-empty field-name) (not (nil? analyzer))]}
     (let [builder (QueryBuilder. analyzer)]
       (case query-type
         :query (.createBooleanQuery builder (name field-name) str-query)
