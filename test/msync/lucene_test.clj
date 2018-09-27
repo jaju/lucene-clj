@@ -13,7 +13,7 @@
                                  repeat)
                             (rest csv-coll))
       directory        (lucene/>memory-index)
-      analyzer         (lucene/*>analyzer*)
+      analyzer         (lucene/>analyzer)
       _                (lucene/index-all! directory data {:suggest-fields {:first-name 1}})]
 
   (deftest basic-tests

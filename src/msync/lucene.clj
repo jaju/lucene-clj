@@ -10,7 +10,6 @@
            [org.apache.lucene.document Field Document FieldType]
            [java.util.logging Logger Level]
            [clojure.lang Sequential]
-           [org.apache.lucene.util QueryBuilder]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
            [org.apache.lucene.search.suggest.document SuggestField Completion50PostingsFormat PrefixCompletionQuery SuggestIndexSearcher TopSuggestDocs]
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
@@ -34,7 +33,7 @@
   ([^Collection stop-words] (>standard-analyzer stop-words true))
   ([^Collection stop-words ^Boolean ignore-case?] (StandardAnalyzer. (CharArraySet. stop-words ignore-case?))))
 
-(def ^:dynamic *>analyzer* >standard-analyzer)
+(def >analyzer >standard-analyzer)
 (def ^:private suggest-field-prefix "$suggest-")
 
 (defn- >filter-codec-for-suggestiions []
@@ -47,7 +46,7 @@
 
 (defn- >index-writer-config
   ([]
-   (>index-writer-config (*>analyzer*)))
+   (>index-writer-config (>analyzer)))
   ([^Analyzer analyzer]
    (let [config (IndexWriterConfig. analyzer)]
      (.setCodec config (>filter-codec-for-suggestiions))
@@ -85,39 +84,28 @@
      (.log logger Level/FINEST (str "Created suggest field with name " key " and value " value))
      (SuggestField. key value weight))))
 
-(defonce -docs (atom []))
 (defn map->document [m {:keys [stored-fields indexed-fields suggest-fields]}]
   "Convert a map to a Lucene document.
   Lossy on the way back. String field names come back as keywords."
-  (let [stored-fields            (or stored-fields (->> m keys (into #{})))
-        indexed-fields           (or indexed-fields (zipmap (keys m) (repeat :full)))
-        suggest-fields           (or suggest-fields {})
-        field-keys               (keys m)
-        field-creator-fn         (fn [k]
-                                   (>field k (get m k)
-                                           {:index-type (get indexed-fields k false)
-                                            :stored?    (contains? stored-fields k)}))
-        suggest-field-creator-fn (fn [[field-name weight]]
-                                   (let [value (get m field-name)]
-                                     (>suggest-field field-name value weight)))
-        fields                   (map field-creator-fn field-keys)
-        suggest-fields           (map suggest-field-creator-fn suggest-fields)
-        doc                      (Document.)]
+  (let [field-keys            (keys m)
+        stored-fields         (or stored-fields (into #{} field-keys))
+        indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
+        suggest-fields        (or suggest-fields {})
+        field-creator         (fn [k]
+                                (>field k (get m k)
+                                        {:index-type (get indexed-fields k false)
+                                         :stored?    (contains? stored-fields k)}))
+        suggest-field-creator (fn [[field-name weight]]
+                                (let [value (get m field-name)]
+                                  (>suggest-field field-name value weight)))
+        fields                (map field-creator field-keys)
+        suggest-fields        (map suggest-field-creator suggest-fields)
+        doc                   (Document.)]
     (doseq [^Field field fields]
       (.add doc field))
     (doseq [^SuggestField field suggest-fields]
       (.add doc field))
-    (swap! -docs conj doc)
     doc))
-
-(defn document->map [^Document document]
-  "Lucene document to map. Keys are always keywords.
-  Only stored fields come back."
-  (reduce
-    (fn [m field]
-      (assoc m (-> field .name keyword) (-> field .stringValue)))
-    {}
-    document))
 
 (defn ^Directory >memory-index
   "Lucene Directory for transient indexes"
@@ -136,7 +124,7 @@
   [^Directory directory
    ^Sequential map-docs
    {:keys [analyzer]
-    :or   {analyzer (*>analyzer*)}
+    :or   {analyzer (>analyzer)}
     :as   opts}]
   (let [index-writer-config (>index-writer-config analyzer)
         index-writer        (>index-writer directory index-writer-config)]
@@ -162,6 +150,16 @@
     (.addDocument index-writer document)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn document->map [^Document document]
+  "Convenience.
+  Lucene document to map. Keys are always keywords. Values come back as string.
+  Only stored fields come back."
+  (reduce
+    (fn [m field]
+      (assoc m (-> field .name keyword) (-> field .stringValue)))
+    {}
+    document))
+
 (defmulti ^:private search* #(class (first %&)))
 
 (defmethod search* Directory
@@ -175,7 +173,7 @@
     :or   {results-per-page 10
            max-results      results-per-page
            page             0
-           analyzer         (*>analyzer*)}}]
+           analyzer         (>analyzer)}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
         ^Query query            (query/parse-expression query-form {:analyzer analyzer :query-type query-type :field-name field-name})
         ^TopDocs hits           (.search searcher query (int max-results))
@@ -186,9 +184,8 @@
                                (range start end))]
         (let [doc-id  (.doc hit)
               doc     (.doc searcher doc-id)
-              doc-map (document->map doc)
               score   (.score hit)]
-          {:hit doc-map :score score :doc-id doc-id})))))
+          {:hit doc :score score :doc-id doc-id})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn search [store query-form opts]
@@ -206,18 +203,17 @@
     (suggest reader field prefix-query opts)))
 
 (defmethod suggest IndexReader
-  [reader field prefix-query {:keys [analyzer num-hits]}]
+  [reader field ^String prefix-query {:keys [analyzer num-hits]}]
   (let [suggest-field        (str suggest-field-prefix (name field))
         term                 (Term. suggest-field prefix-query)
-        analyzer             (or analyzer (*>analyzer*))
+        analyzer             (or analyzer (>analyzer))
         pcq                  (PrefixCompletionQuery. analyzer term)
         suggester            (SuggestIndexSearcher. reader)
         num-hits             (min 10 (or num-hits 10))
         ^TopSuggestDocs hits (.suggest suggester pcq num-hits true)]
     (vec
       (for [^ScoreDoc hit (.scoreDocs hits)]
-        (let [doc-id (.doc hit)
-              doc (.doc suggester doc-id)
-              doc-map (document->map doc)
-              score (.score hit)]
-          {:hit doc-map :score score :doc-id doc-id})))))
+        (let [doc-id  (.doc hit)
+              doc     (.doc suggester doc-id)
+              score   (.score hit)]
+          {:hit doc :score score :doc-id doc-id})))))
