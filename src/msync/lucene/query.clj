@@ -1,7 +1,7 @@
 (ns msync.lucene.query
   (:import
     [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur BooleanClause]
-    [clojure.lang Sequential IPersistentSet IPersistentMap]
+    [clojure.lang Sequential IPersistentSet IPersistentMap IMapEntry]
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]))
 
@@ -10,6 +10,21 @@
 (defprotocol QueryExpression
   (parse-expression [expr opts]))
 
+(defn- query-subexp-meta-process [subexp opts]
+  (if (instance? IMapEntry subexp)
+    (let [[k v] subexp]
+      [v (assoc opts :field-name (name k))])
+    [subexp opts]))
+
+(defn- pred-combine-subexps [subexps opts ^BooleanClause$Occur occur-condition]
+  (let [qb (BooleanQuery$Builder.)]
+    (doseq [q (keep (fn [e]
+                      (let [[updated-e updated-opts] (query-subexp-meta-process e opts)]
+                        (parse-expression updated-e updated-opts)))
+                    subexps)]
+      (.add qb q occur-condition))
+    (.build qb)))
+
 (extend-protocol QueryExpression
 
   Query
@@ -17,27 +32,18 @@
 
   Sequential
   (parse-expression [coll opts]
-    (let [qb (BooleanQuery$Builder.)]
-      (doseq [q (keep #(parse-expression % opts) coll)]
-        (.add qb q BooleanClause$Occur/MUST))
-      (.build qb)))
+    (pred-combine-subexps coll opts BooleanClause$Occur/MUST))
 
   IPersistentSet
   (parse-expression [s opts]
-    (let [qb (BooleanQuery$Builder.)]
-      (doseq [q (keep #(parse-expression % opts) s)]
-        (.add qb q BooleanClause$Occur/SHOULD))
-      (.build qb)))
+    (pred-combine-subexps s opts BooleanClause$Occur/SHOULD))
 
   IPersistentMap
   (parse-expression [m opts]
-    (let [qb (BooleanQuery$Builder.)]
-      (doseq [q (keep (fn [[k v]] (parse-expression v (assoc opts :field-name (name k)))) m)]
-        (.add qb q BooleanClause$Occur/MUST))
-      (.build qb)))
+    (pred-combine-subexps m opts BooleanClause$Occur/MUST))
 
   String
-  (parse-expression [str-query {:keys [^Analyzer analyzer field-name query-type] :as opts}]
+  (parse-expression [str-query {:keys [^Analyzer analyzer field-name query-type]}]
     {:pre [(not-empty field-name) (not (nil? analyzer))]}
     (let [builder (QueryBuilder. analyzer)]
       (case query-type

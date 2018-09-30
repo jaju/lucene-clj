@@ -39,5 +39,8 @@
 
   (deftest or-search-with-set
     (testing "test an OR set"
-      (is (= 2 (count (lucene/search directory #{"Shambhu" "Jupiterwala"} {:field-name "last-name"})))))))
+      (is (= 2 (count (lucene/search directory #{"Shambhu" "Jupiterwala"} {:field-name "last-name"}))))))
 
+  (deftest search-with-map
+    (testing "test an AND set"
+      (is (= 1 (count (lucene/search directory {:last-name "Shambhu"} {})))))))

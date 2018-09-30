@@ -36,7 +36,7 @@
 (def >analyzer >standard-analyzer)
 (def ^:private suggest-field-prefix "$suggest-")
 
-(defn- >filter-codec-for-suggestiions []
+(defn- >filter-codec-for-suggestions []
   (let [comp-postings-format (Completion50PostingsFormat.)]
     (proxy [Lucene70Codec] []
       (getPostingsFormatForField [field-name]
@@ -49,7 +49,7 @@
    (>index-writer-config (>analyzer)))
   ([^Analyzer analyzer]
    (let [config (IndexWriterConfig. analyzer)]
-     (.setCodec config (>filter-codec-for-suggestiions))
+     (.setCodec config (>filter-codec-for-suggestions))
      config)))
 
 (defn- ^IndexWriter >index-writer
