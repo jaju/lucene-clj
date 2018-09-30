@@ -10,7 +10,11 @@
 (defprotocol QueryExpression
   (parse-expression [expr opts]))
 
-(defn- query-subexp-meta-process [subexp opts]
+(defn- query-subexp-meta-process
+  "If the sub-expression is a map-entry, pick the field-name from the key.
+  Otherwise, use the sub-expression as-is. It is assumed in the non map-entry case, the field-name
+  is part of the input parameters - opts"
+  [subexp opts]
   (if (instance? IMapEntry subexp)
     (let [[k v] subexp]
       [v (assoc opts :field-name (name k))])
@@ -45,7 +49,10 @@
   String
   (parse-expression [str-query {:keys [^Analyzer analyzer field-name query-type]}]
     {:pre [(not-empty field-name) (not (nil? analyzer))]}
-    (let [builder (QueryBuilder. analyzer)]
+    (let [builder    (QueryBuilder. analyzer)
+          query-type (or query-type (if (re-find #"\s" str-query)
+                                      :phrase-query
+                                      :query))]
       (case query-type
         :query (.createBooleanQuery builder (name field-name) str-query)
         :phrase-query (.createPhraseQuery builder (name field-name) str-query)
