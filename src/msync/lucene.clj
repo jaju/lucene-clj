@@ -10,8 +10,8 @@
            [org.apache.lucene.document Field Document FieldType]
            [java.util.logging Logger Level]
            [clojure.lang Sequential]
-           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc BooleanClause$Occur BooleanQuery$Builder]
-           [org.apache.lucene.search.suggest.document SuggestField Completion50PostingsFormat PrefixCompletionQuery SuggestIndexSearcher TopSuggestDocs ContextSuggestField ContextQuery]
+           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
+           [org.apache.lucene.search.suggest.document SuggestField Completion50PostingsFormat PrefixCompletionQuery SuggestIndexSearcher TopSuggestDocs ContextSuggestField ContextQuery CompletionAnalyzer]
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
@@ -89,11 +89,12 @@
 
 (defn- ^SuggestField >suggest-field
   "Document SuggestField"
-  ([key contexts value weight]
-   (let [key                        (str suggest-field-prefix (name key))
-         ^ContextSuggestField field (ContextSuggestField. key value weight contexts)]
-     (.log logger Level/FINEST (str "Created suggest field with name " key " and value " value))
-     field)))
+  [key contexts value weight]
+  (let [key                        (str suggest-field-prefix (name key))
+        contexts                   (if (empty? contexts) nil contexts)
+        ^ContextSuggestField field (ContextSuggestField. key value weight contexts)]
+    (.log logger Level/FINEST (str "Created suggest field with name " key " and value " value))
+    field))
 
 (defn map->document [m {:keys [stored-fields indexed-fields suggest-fields context-fn]}]
   "Convert a map to a Lucene document.
@@ -106,7 +107,7 @@
                                 (>field k (get m k)
                                         {:index-type (get indexed-fields k false)
                                          :stored?    (contains? stored-fields k)}))
-        context-fn            (or context-fn (fn [_] []))
+        context-fn            (or context-fn (constantly nil))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight]]
                                 (let [value (get m field-name)]
@@ -208,27 +209,31 @@
 (defmulti suggest #(class (first %&)))
 
 (defmethod suggest Directory
-  [directory field prefix-query opts]
-  (with-open [reader (>index-reader directory)]
-    (suggest reader field prefix-query opts)))
+  ([directory field prefix-query opts]
+   (with-open [reader (>index-reader directory)]
+     (suggest reader field prefix-query opts)))
+  ([directory field prefix-query context opts]
+   (with-open [reader (>index-reader directory)]
+     (suggest reader field prefix-query context opts))))
+
 
 (defmethod suggest IndexReader
   ([reader field ^String prefix-query {:keys [analyzer num-hits] :as opts}]
-    (suggest reader field prefix-query [] opts))
+   (suggest reader field prefix-query [] opts))
   ([reader field ^String prefix-query contexts {:keys [analyzer num-hits]}]
-    (let [suggest-field        (str suggest-field-prefix (name field))
-          term                 (Term. suggest-field prefix-query)
-          analyzer             (or analyzer (>analyzer))
-          pcq                  (PrefixCompletionQuery. analyzer term)
-          cq                   (ContextQuery. pcq)
-          _                    (doseq [context contexts]
-                                 (.addContext cq context))
-          suggester            (SuggestIndexSearcher. reader)
-          num-hits             (min 10 (or num-hits 10))
-          ^TopSuggestDocs hits (.suggest suggester cq num-hits true)]
-      (vec
-        (for [^ScoreDoc hit (.scoreDocs hits)]
-          (let [doc-id (.doc hit)
-                doc    (.doc suggester doc-id)
-                score  (.score hit)]
-            {:hit doc :score score :doc-id doc-id}))))))
+   (let [suggest-field        (str suggest-field-prefix (name field))
+         term                 (Term. suggest-field prefix-query)
+         analyzer             (or analyzer (>analyzer))
+         pcq                  (PrefixCompletionQuery. analyzer term)
+         cq                   (ContextQuery. pcq)
+         _                    (doseq [context contexts]
+                                (.addContext cq context))
+         suggester            (SuggestIndexSearcher. reader)
+         num-hits             (min 10 (or num-hits 10))
+         ^TopSuggestDocs hits (.suggest suggester cq num-hits false)]
+     (vec
+       (for [^ScoreDoc hit (.scoreDocs hits)]
+         (let [doc-id (.doc hit)
+               doc    (.doc suggester doc-id)
+               score  (.score hit)]
+           {:hit doc :score score :doc-id doc-id}))))))

@@ -14,7 +14,8 @@
   :aot :all
 
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]]
-                    :source-paths ["dev"]}
+                    :source-paths ["dev"]
+                    :resource-paths ["test-resources"]}
 
              :test {:dependencies   [[org.clojure/data.csv "0.1.4"]]
                     :resource-paths ["test-resources"]}
