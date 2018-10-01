@@ -106,6 +106,7 @@
                                 (>field k (get m k)
                                         {:index-type (get indexed-fields k false)
                                          :stored?    (contains? stored-fields k)}))
+        context-fn            (or context-fn (fn [_] []))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight]]
                                 (let [value (get m field-name)]

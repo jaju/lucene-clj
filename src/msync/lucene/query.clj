@@ -53,6 +53,7 @@
           query-type (or query-type (if (re-find #"\s" str-query)
                                       :phrase-query
                                       :query))]
+      (println (str "Query type is " query-type))
       (case query-type
         :query (.createBooleanQuery builder (name field-name) str-query)
         :phrase-query (.createPhraseQuery builder (name field-name) str-query)

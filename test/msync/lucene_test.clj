@@ -29,8 +29,8 @@
 
   (deftest phrase-search
     (testing "in the bio field"
-      (is (= 1 (count (lucene/phrase-search directory "then some more" {:field-name "bio"}))))
-      (is (= 2 (count (lucene/phrase-search directory "love him" {:field-name "bio"}))))))
+      (is (= 1 (count (lucene/search directory "then some more" {:field-name "bio"}))))
+      (is (= 2 (count (lucene/search directory "love him" {:field-name "bio"}))))))
 
   (deftest suggestions
     (testing "suggest first names"
