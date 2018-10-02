@@ -52,6 +52,23 @@ _Given_
                    {:suggest-fields {:name 5}})
 ```
 
+* A brief note about the search and suggest results
+These function calls return a sequence of maps with the following structure for one map (may change!)
+```clojure
+{:hit ^org.apache.lucene.document.Document Object
+ :score 'float
+ :doc-id 'number}
+```
+
+There's a convenience function to convert the Lucene _Document_ object to a Clojure map.
+```clojure
+(lucene/document->map (:hit 'one-response))
+;; In bulk
+(->> (lucene/search idx "query-string" {:field-name "field-name-to-search-in"})
+     (map :hit)
+     (map lucene/document->map))
+```
+
 * Search
 ```clojure
 (lucene/search idx "Ram" {:field-name :name})
