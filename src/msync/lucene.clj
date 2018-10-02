@@ -203,30 +203,37 @@
           {:hit doc :score score :doc-id doc-id})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn search [store query-form opts]
-  (search* store query-form opts))
+(defn search
+  ([store query-form]
+   (search store query-form {}))
+  ([store query-form opts]
+   (search* store query-form opts)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defmulti suggest #(class (first %&)))
+(defmulti suggest
+          "Return suggestions for prefix-queries. The index should have been created with
+appropriate configuration for which fields should be analyzed for creating the suggestions
+infrastructure."
+          #(class (first %&)))
 
 (defmethod suggest Directory
+
+  ([directory field prefix-query]
+   (suggest directory field prefix-query {}))
   ([directory field prefix-query opts]
    (with-open [reader (>index-reader directory)]
-     (suggest reader field prefix-query opts)))
-  ([directory field prefix-query context opts]
-   (with-open [reader (>index-reader directory)]
-     (suggest reader field prefix-query context opts))))
-
+     (suggest reader field prefix-query opts))))
 
 (defmethod suggest IndexReader
-  ([reader field ^String prefix-query {:keys [analyzer num-hits] :as opts}]
-   (suggest reader field prefix-query [] opts))
-  ([reader field ^String prefix-query contexts {:keys [analyzer num-hits]}]
+  ([reader field ^String prefix-query]
+   (suggest reader field prefix-query {}))
+  ([reader field ^String prefix-query {:keys [contexts analyzer num-hits]}]
    (let [suggest-field        (str suggest-field-prefix (name field))
          term                 (Term. suggest-field prefix-query)
          analyzer             (or analyzer (>analyzer))
          pcq                  (PrefixCompletionQuery. analyzer term)
          cq                   (ContextQuery. pcq)
+         contexts             (or contexts [])
          _                    (doseq [context contexts]
                                 (.addContext cq context))
          suggester            (SuggestIndexSearcher. reader)

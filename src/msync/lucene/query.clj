@@ -3,7 +3,8 @@
     [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur BooleanClause]
     [clojure.lang Sequential IPersistentSet IPersistentMap IMapEntry]
     [org.apache.lucene.util QueryBuilder]
-    [org.apache.lucene.analysis Analyzer]))
+    [org.apache.lucene.analysis Analyzer]
+    [org.apache.lucene.queryparser.classic QueryParser]))
 
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
@@ -57,3 +58,11 @@
         :query (.createBooleanQuery builder (name field-name) str-query)
         :phrase-query (.createPhraseQuery builder (name field-name) str-query)
         (throw (ex-info (str "Unsupported query type - " (name query-type)) {:query-type query-type}))))))
+
+(defn parse-dsl-expression [^String dsl-expression default-field-name analyzer]
+  (let [default-field-name (name default-field-name)
+        ^QueryParser qp    (QueryParser. default-field-name analyzer)]
+    (doto qp
+      (.setSplitOnWhitespace true)
+      (.setAutoGeneratePhraseQueries true))
+    (.parse qp dsl-expression)))

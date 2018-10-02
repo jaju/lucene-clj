@@ -77,10 +77,10 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 ```clojure
 (lucene/search idx "Ram" {:field-name :name})
 ; The same as
-(lucene/search idx {:name "Ram"} {}) ;; Empty last options argument
+(lucene/search idx {:name "Ram"})
 
 ;; Search for either Ram or Krishna
-(lucene/search idx {:name #{"Krishna" "Ram"}} {})
+(lucene/search idx {:name #{"Krishna" "Ram"}})
 ```
 
 * Phrase search
@@ -88,12 +88,12 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 ;; Space(s) in the query string are inferred to mean a phrase search operation
 (lucene/search idx "read more" {:field-name "description"})
 ;; The same as
-(lucene/search idx {:description "read more"} {})
+(lucene/search idx {:description "read more"})
 ```
 
 * Suggestion
 ```clojure
-(lucene/suggest idx :name "Ra" {})
+(lucene/suggest idx :name "Ra")
 ```
 
 ## License

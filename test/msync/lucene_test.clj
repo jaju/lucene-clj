@@ -4,7 +4,8 @@
             [clojure.data.csv :as csv]
             [msync.lucene :as lucene]
             [msync.lucene.utils :as utils]
-            [clojure.string :as string]))
+            [clojure.string :as string]
+            [msync.lucene.query :as query]))
 
 (def index')
 (defonce analyzer (lucene/>analyzer))
@@ -43,7 +44,11 @@
 
     (testing "by last name"
       (is (= 1 (count
-                 (lucene/search index "Jupiterwala" {:field-name "last-name"}))))))
+                 (lucene/search index "Jupiterwala" {:field-name "last-name"})))))
+
+    (testing "query details via a map, and no opts"
+      (is (= 1 (count
+                 (lucene/search index {:last-name "Jupiterwala"}))))))
 
   (deftest phrase-search
     (testing "in the bio field"
@@ -55,18 +60,18 @@
   (deftest suggestions
     (testing "suggest first names"
       (is (= 4 (count
-                 (lucene/suggest index :first-name "S" {}))))
+                 (lucene/suggest index :first-name "S"))))
       (is (= 2 (count
-                 (lucene/suggest index :first-name "Cha" {}))))))
+                 (lucene/suggest index :first-name "Cha"))))))
 
   ;; Using contexts. Contexts work differently than fields. All contexts are clubbed together.
   ;; I wish I understood this design rationale better.
   (deftest suggestions-with-context
     (testing "suggest first names with and without context"
       (is (= 2 (count
-                 (lucene/suggest index :first-name "Oli" {}))))
+                 (lucene/suggest index :first-name "Oli"))))
       (is (= 1 (count
-                 (lucene/suggest index :first-name "Oli" ["true"] {}))))))
+                 (lucene/suggest index :first-name "Oli" {:contexts ["true"]}))))))
 
   (deftest or-search-with-set
     (testing "test an OR set"
@@ -76,6 +81,16 @@
   (deftest search-with-map-multi-fields
     (testing "multiple fields"
       (is (= 2 (count
-                 (lucene/search index {:first-name "Oliver"} {}))))
+                 (lucene/search index {:first-name "Oliver"}))))
       (is (= 1 (count
-                 (lucene/search index {:first-name "Oliver" :real "true"} {})))))))
+                 (lucene/search index {:first-name "Oliver" :real "true"}))))))
+
+  (deftest parse-query-dsl
+    (testing "Given a classic query string"
+      (is (= "name:shikari name:shambhu (real:true)^2.0"
+            (str (query/parse-dsl-expression "Shikari Shambhu real:true^2" "name" (lucene/>analyzer)))))))
+
+  (deftest search-with-query-dsl
+    (testing "Search for the Shikari using the classic query DSL"
+      (is (= 1 (count
+                 (lucene/search index (query/parse-dsl-expression "shikari" :first-name (lucene/>analyzer)))))))))
