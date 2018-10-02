@@ -25,7 +25,7 @@ Bad implementation ideas are my own, of course.
 
 _To be completed_. 
 
-Note: There are some samples to look at in the tests as well. A sample data-set exists in [here](test-resources/data-sample.csv),
+Note: There are some samples to look at in the tests as well. A sample data-set exists in [here](test-resources/sample-data.csv),
 which is used in the tests.
 
 _Given_
