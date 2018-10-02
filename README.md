@@ -1,6 +1,8 @@
 # org.msync/lucene-clj
 
-A Clojure wrapper for Apache Lucene
+A Clojure wrapper for Apache Lucene.
+
+Note: **UNSTABLE** API. No releases yet.
 
 ## What?
 
