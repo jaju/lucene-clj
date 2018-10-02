@@ -40,14 +40,14 @@ _Given_
 
 ### A simple but complete example
 
-* Create an index
+#### Create an index
 ```clojure
 (def idx (lucene/>memory-index)) ; In-memory index
 ; OR
 (def idx (lucene/>disk-index "/path/to/index/directory")) ; On disk
 ```
 
-* Index a document. Use Clojure maps
+#### Index a document. Use Clojure maps
 ```clojure
 (lucene/index-all! idx
                    [{:name "Ram" :description "A just king. Ethical. Read more in Ramayan."}
@@ -56,7 +56,7 @@ _Given_
                    {:suggest-fields {:name 5}})
 ```
 
-* A brief note about the search and suggest results
+#### A brief note about the search and suggest results
 These function calls return a sequence of maps with the following structure for one map (may change!)
 ```clojure
 {:hit ^org.apache.lucene.document.Document Object
@@ -73,7 +73,7 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
      (map lucene/document->map))
 ```
 
-* Search
+#### Search
 ```clojure
 (lucene/search idx "Ram" {:field-name :name})
 ; The same as
@@ -83,7 +83,7 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 (lucene/search idx {:name #{"Krishna" "Ram"}})
 ```
 
-* Phrase search
+#### Phrase search
 ```clojure
 ;; Space(s) in the query string are inferred to mean a phrase search operation
 (lucene/search idx "read more" {:field-name "description"})
@@ -91,7 +91,7 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 (lucene/search idx {:description "read more"})
 ```
 
-* Suggestion
+#### Suggestion
 ```clojure
 (lucene/suggest idx :name "Ra")
 ```
