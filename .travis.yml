@@ -1,0 +1,13 @@
+language: clojure
+
+lein: lein
+
+script: "lein do clean, test"
+
+jdk:
+  - oraclejdk10
+  - oraclejdk9
+  - oraclejdk8
+  - openjdk10
+  - openjdk9
+  - openjdk8

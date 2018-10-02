@@ -1,4 +1,4 @@
-# org.msync/lucene-clj
+# org.msync/lucene-clj [![Build Status](https://secure.travis-ci.org/jaju/lucene-clj.png)](http://travis-ci.org/jaju/lucene-clj)
 
 A Clojure wrapper for Apache Lucene.
 
@@ -20,6 +20,10 @@ When I found out the above inspirations, there were a few aspects that I wanted 
 
 I am sincerely thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
 Bad implementation ideas are my own, of course.
+
+# Dependency
+    [org.msync/lucene-clj "0.1.0-SNAPSHOT"]
+(Available via [clojars](https://clojars.org/search?q=lucene-clj))
 
 ## Usage
 

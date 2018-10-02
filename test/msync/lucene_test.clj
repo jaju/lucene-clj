@@ -73,11 +73,6 @@
       (is (= 2 (count
                  (lucene/search index #{"Shambhu" "Jupiterwala"} {:field-name "last-name"}))))))
 
-  (deftest search-with-map
-    (testing "test an AND set"
-      (is (= 1 (count
-                 (lucene/search index {:last-name "Shambhu"} {}))))))
-
   (deftest search-with-map-multi-fields
     (testing "multiple fields"
       (is (= 2 (count
