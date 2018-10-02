@@ -88,9 +88,12 @@
   (deftest parse-query-dsl
     (testing "Given a classic query string"
       (is (= "name:shikari name:shambhu (real:true)^2.0"
-            (str (query/parse-dsl-expression "Shikari Shambhu real:true^2" "name" (lucene/>analyzer)))))))
+             (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (lucene/>analyzer)))))))
 
   (deftest search-with-query-dsl
     (testing "Search for the Shikari using the classic query DSL"
       (is (= 1 (count
-                 (lucene/search index (query/parse-dsl-expression "shikari" :first-name (lucene/>analyzer)))))))))
+                 (lucene/search index (query/parse-dsl "shikari" :first-name (lucene/>analyzer))))))
+
+      (is (= 2 (count
+                 (lucene/search index (query/parse-dsl "gender:f" (lucene/>analyzer)))))))))

@@ -9,7 +9,7 @@
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
 (defprotocol QueryExpression
-  (parse-expression [expr opts]))
+  (parse [expr opts]))
 
 (defn- query-subexp-meta-process
   "If the sub-expression is a map-entry, pick the field-name from the key.
@@ -25,7 +25,7 @@
   (let [qb (BooleanQuery$Builder.)]
     (doseq [q (keep (fn [e]
                       (let [[updated-e updated-opts] (query-subexp-meta-process e opts)]
-                        (parse-expression updated-e updated-opts)))
+                        (parse updated-e updated-opts)))
                     subexps)]
       (.add qb q occur-condition))
     (.build qb)))
@@ -33,22 +33,22 @@
 (extend-protocol QueryExpression
 
   Query
-  (parse-expression [query _] query)
+  (parse [query _] query)
 
   Sequential
-  (parse-expression [subexps-coll opts]
+  (parse [subexps-coll opts]
     (combine-query-subexps subexps-coll opts BooleanClause$Occur/MUST))
 
   IPersistentSet
-  (parse-expression [subexps-set opts]
+  (parse [subexps-set opts]
     (combine-query-subexps subexps-set opts BooleanClause$Occur/SHOULD))
 
   IPersistentMap
-  (parse-expression [field-wise-supexps opts]
+  (parse [field-wise-supexps opts]
     (combine-query-subexps field-wise-supexps opts BooleanClause$Occur/MUST))
 
   String
-  (parse-expression [str-query {:keys [^Analyzer analyzer field-name query-type]}]
+  (parse [str-query {:keys [^Analyzer analyzer field-name query-type]}]
     {:pre [(not-empty field-name) (not (nil? analyzer))]}
     (let [builder    (QueryBuilder. analyzer)
           query-type (or query-type (if (re-find #"\s" str-query)
@@ -59,10 +59,13 @@
         :phrase-query (.createPhraseQuery builder (name field-name) str-query)
         (throw (ex-info (str "Unsupported query type - " (name query-type)) {:query-type query-type}))))))
 
-(defn parse-dsl-expression [^String dsl-expression default-field-name analyzer]
-  (let [default-field-name (name default-field-name)
-        ^QueryParser qp    (QueryParser. default-field-name analyzer)]
-    (doto qp
-      (.setSplitOnWhitespace true)
-      (.setAutoGeneratePhraseQueries true))
-    (.parse qp dsl-expression)))
+(defn parse-dsl
+  ([^String dsl ^Analyzer analyzer]
+   (parse-dsl dsl "" analyzer))
+  ([^String dsl ^String default-field-name ^Analyzer analyzer]
+   (let [default-field-name (name default-field-name)
+         ^QueryParser qp    (QueryParser. default-field-name analyzer)]
+     (doto qp
+       (.setSplitOnWhitespace true)
+       (.setAutoGeneratePhraseQueries true))
+     (.parse qp dsl))))
