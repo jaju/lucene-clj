@@ -49,7 +49,7 @@
           (proxy-super getPostingsFormatForField field-name))))))
 
 (defn- >index-writer-config
-  "IndexWriteConfig instance."
+  "IndexWriterConfig instance."
   ([]
    (>index-writer-config (>analyzer)))
   ([^Analyzer analyzer]
@@ -98,7 +98,7 @@
 
 (defn map->document [m {:keys [stored-fields indexed-fields suggest-fields context-fn]}]
   "Convert a map to a Lucene document.
-  Lossy on the way back. String field names come back as keywords."
+  Lossy on the way back. Also, string field names come back as keywords."
   (let [field-keys            (keys m)
         stored-fields         (or stored-fields (into #{} field-keys))
         indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))

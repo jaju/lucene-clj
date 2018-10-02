@@ -18,14 +18,15 @@ When I found out the above inspirations, there were a few aspects that I wanted 
 * Stick to _core_ Lucene. No script/language specific dependencies part of the core language. Except, maybe, English.
 * Support for _suggestions_ - a feature of Lucene I found quite undocumented, as well as lacking good examples for.
 
-I honestly am thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
+I am sincerely thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
 Bad implementation ideas are my own, of course.
 
 ## Usage
 
 _To be completed_. 
 
-Some samples to look at in the tests.
+Note: There are some samples to look at in the tests as well. A sample data-set exists in [here](test-resources/data-sample.csv),
+which is used in the tests.
 
 _Given_
 ```clojure

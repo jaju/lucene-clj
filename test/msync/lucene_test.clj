@@ -30,6 +30,7 @@
                                            :analyzer analyzer})]
 
   (alter-var-root #'index' (constantly index))
+  ;; This is to hold onto the index when created during REPL-driven development, and this buffer is eval'ed.
 
   (deftest basic-tests
     (testing "directory"
@@ -58,6 +59,8 @@
       (is (= 2 (count
                  (lucene/suggest index :first-name "Cha" {}))))))
 
+  ;; Using contexts. Contexts work differently than fields. All contexts are clubbed together.
+  ;; I wish I understood this design rationale better.
   (deftest suggestions-with-context
     (testing "suggest first names with and without context"
       (is (= 2 (count
