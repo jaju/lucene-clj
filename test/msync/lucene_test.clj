@@ -3,64 +3,81 @@
             [clojure.java.io :as io]
             [clojure.data.csv :as csv]
             [msync.lucene :as lucene]
+            [msync.lucene.utils :as utils]
             [clojure.string :as string]))
 
-(def directory')
+(def index')
+(defonce analyzer (lucene/>analyzer))
+(defonce suggestion-context-fields [:real])
+(defn context-fn [doc-map]
+  (->> (select-keys doc-map suggestion-context-fields)
+       vals
+       (map string/lower-case)
+       into-array))
 
-(let [content-resource (io/resource "sample-data.csv")
-      content          (slurp content-resource)
-      csv-coll         (csv/read-csv content)
-      data             (map zipmap
-                            (->> (first csv-coll)
-                                 (map keyword)
-                                 repeat)
-                            (rest csv-coll))
-      directory        (lucene/>memory-index)
-      analyzer         (lucene/>analyzer)
-      context-fn       (fn [m]
-                         (->> (select-keys m [:real])
-                              vals
-                              (map string/lower-case)
-                              into-array))
-      _                (lucene/index-all! directory data {:suggest-fields {:first-name 5} :context-fn context-fn :analyzer analyzer})]
+(let [data             (-> "sample-data.csv"
+                           io/resource
+                           slurp
+                           csv/read-csv
+                           utils/docfields-vecs-to-maps)
 
-  (alter-var-root #'directory' (constantly directory))
+      index            (lucene/>memory-index)
+
+      _                (lucene/index-all! index
+                                          data
+                                          {:suggest-fields {:first-name 5}
+                                           :context-fn context-fn
+                                           :analyzer analyzer})]
+
+  (alter-var-root #'index' (constantly index))
 
   (deftest basic-tests
     (testing "directory"
-      (is (not-empty (.listAll directory)))))
+      (is (not-empty (.listAll index)))))
 
   (deftest basic-search
     (testing "by first name"
-      (is (= 1 (count (lucene/search directory "Shikari" {:field-name "first-name"})))))
+      (is (= 1 (count
+                 (lucene/search index "Shikari" {:field-name "first-name"})))))
 
     (testing "by last name"
-      (is (= 1 (count (lucene/search directory "Jupiterwala" {:field-name "last-name"}))))))
+      (is (= 1 (count
+                 (lucene/search index "Jupiterwala" {:field-name "last-name"}))))))
 
   (deftest phrase-search
     (testing "in the bio field"
-      (is (= 1 (count (lucene/search directory "then some more" {:field-name "bio"}))))
-      (is (= 2 (count (lucene/search directory "love him" {:field-name "bio"}))))))
+      (is (= 1 (count
+                 (lucene/search index "then some more" {:field-name "bio"}))))
+      (is (= 2 (count
+                 (lucene/search index "love him" {:field-name "bio"}))))))
 
   (deftest suggestions
     (testing "suggest first names"
-      (is (= 4 (count (lucene/suggest directory :first-name "S" {}))))
-      (is (= 2 (count (lucene/suggest directory :first-name "Cha" {}))))))
+      (is (= 4 (count
+                 (lucene/suggest index :first-name "S" {}))))
+      (is (= 2 (count
+                 (lucene/suggest index :first-name "Cha" {}))))))
 
   (deftest suggestions-with-context
     (testing "suggest first names with and without context"
-      (is (= 2 (count (lucene/suggest directory :first-name "Oli" {}))))
-      (is (= 1 (count (lucene/suggest directory :first-name "Oli" ["true"] {}))))))
+      (is (= 2 (count
+                 (lucene/suggest index :first-name "Oli" {}))))
+      (is (= 1 (count
+                 (lucene/suggest index :first-name "Oli" ["true"] {}))))))
 
   (deftest or-search-with-set
     (testing "test an OR set"
-      (is (= 2 (count (lucene/search directory #{"Shambhu" "Jupiterwala"} {:field-name "last-name"}))))))
+      (is (= 2 (count
+                 (lucene/search index #{"Shambhu" "Jupiterwala"} {:field-name "last-name"}))))))
 
   (deftest search-with-map
     (testing "test an AND set"
-      (is (= 1 (count (lucene/search directory {:last-name "Shambhu"} {}))))))
+      (is (= 1 (count
+                 (lucene/search index {:last-name "Shambhu"} {}))))))
 
   (deftest search-with-map-multi-fields
     (testing "multiple fields"
-      (is (= 2 (count (lucene/search directory {:first-name "Oliver"} {}))))
-      (is (= 1 (count (lucene/search directory {:first-name "Oliver" :real "true"} {})))))))
+      (is (= 2 (count
+                 (lucene/search index {:first-name "Oliver"} {}))))
+      (is (= 1 (count
+                 (lucene/search index {:first-name "Oliver" :real "true"} {})))))))

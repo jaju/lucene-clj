@@ -20,7 +20,7 @@
       [v (assoc opts :field-name (name k))])
     [subexp opts]))
 
-(defn- pred-combine-subexps [subexps opts ^BooleanClause$Occur occur-condition]
+(defn- combine-query-subexps [subexps opts ^BooleanClause$Occur occur-condition]
   (let [qb (BooleanQuery$Builder.)]
     (doseq [q (keep (fn [e]
                       (let [[updated-e updated-opts] (query-subexp-meta-process e opts)]
@@ -35,16 +35,16 @@
   (parse-expression [query _] query)
 
   Sequential
-  (parse-expression [coll opts]
-    (pred-combine-subexps coll opts BooleanClause$Occur/MUST))
+  (parse-expression [subexps-coll opts]
+    (combine-query-subexps subexps-coll opts BooleanClause$Occur/MUST))
 
   IPersistentSet
-  (parse-expression [s opts]
-    (pred-combine-subexps s opts BooleanClause$Occur/SHOULD))
+  (parse-expression [subexps-set opts]
+    (combine-query-subexps subexps-set opts BooleanClause$Occur/SHOULD))
 
   IPersistentMap
-  (parse-expression [m opts]
-    (pred-combine-subexps m opts BooleanClause$Occur/MUST))
+  (parse-expression [field-wise-supexps opts]
+    (combine-query-subexps field-wise-supexps opts BooleanClause$Occur/MUST))
 
   String
   (parse-expression [str-query {:keys [^Analyzer analyzer field-name query-type]}]

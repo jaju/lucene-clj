@@ -189,6 +189,7 @@
            page             0
            analyzer         (>analyzer)}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
+        field-name              (if field-name (name field-name))
         ^Query query            (query/parse-expression query-form {:analyzer analyzer :field-name field-name})
         ^TopDocs hits           (.search searcher query (int max-results))
         start                   (* page results-per-page)
