@@ -96,4 +96,26 @@
                  (lucene/search index (query/parse-dsl "shikari" :first-name (lucene/>analyzer))))))
 
       (is (= 2 (count
-                 (lucene/search index (query/parse-dsl "gender:f" (lucene/>analyzer)))))))))
+                 (lucene/search index (query/parse-dsl "gender:f" (lucene/>analyzer))))))))
+
+  (deftest paginated-results
+      (let [query {:bio #{"love" "enjoy"}}
+            max-results 10
+            page-0 (lucene/search index query {:max-results max-results :page 0 :results-per-page 2})
+            page-1 (lucene/search index query {:max-results max-results :page 1 :results-per-page 2})
+            page-2 (lucene/search index query {:max-results max-results :page 2 :results-per-page 2})]
+        (testing "Searching a large (ahem!) repository, one chunk at a time"
+          (is (= 2 (count page-0)))
+          (is (= 2 (count page-1)))
+          (is (= 2 (count page-2))))
+
+        (testing "All pages have distinct documents"
+          (is (= 6 (count (into #{} (map :doc-id (flatten [page-0 page-1 page-2])))))))))
+
+  (deftest suggestions-with-limit-params
+    (let [query    "S"
+          result-1 (lucene/suggest index :first-name query {:num-hits 2})
+          result-2 (lucene/suggest index :first-name query {:num-hits 4})]
+      (testing "Asking for suggestions from a large (ahem!) repository, one page at a time"
+        (is (= 2 (count result-1)))
+        (is (= 4 (count result-2)))))))

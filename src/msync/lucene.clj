@@ -6,12 +6,14 @@
            [org.apache.lucene.analysis.standard StandardAnalyzer]
            [java.util Collection]
            [java.io File]
-           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexableFieldType IndexOptions IndexReader DirectoryReader Term]
+           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexableFieldType IndexOptions IndexReader
+                                    DirectoryReader Term]
            [org.apache.lucene.document Field Document FieldType]
            [java.util.logging Logger Level]
            [clojure.lang Sequential]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
-           [org.apache.lucene.search.suggest.document SuggestField Completion50PostingsFormat PrefixCompletionQuery SuggestIndexSearcher TopSuggestDocs ContextSuggestField ContextQuery CompletionAnalyzer]
+           [org.apache.lucene.search.suggest.document SuggestField Completion50PostingsFormat TopSuggestDocs
+                                                      PrefixCompletionQuery SuggestIndexSearcher ContextSuggestField ContextQuery]
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
