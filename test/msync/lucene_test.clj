@@ -114,8 +114,8 @@
 
   (deftest suggestions-with-limit-params
     (let [query    "S"
-          result-1 (lucene/suggest index :first-name query {:num-hits 2})
-          result-2 (lucene/suggest index :first-name query {:num-hits 4})]
+          result-1 (lucene/suggest index :first-name query {:max-results 2})
+          result-2 (lucene/suggest index :first-name query {:max-results 4})]
       (testing "Asking for suggestions from a large (ahem!) repository, one page at a time"
         (is (= 2 (count result-1)))
         (is (= 4 (count result-2)))))))

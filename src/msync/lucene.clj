@@ -229,7 +229,7 @@ infrastructure."
 (defmethod suggest IndexReader
   ([reader field ^String prefix-query]
    (suggest reader field prefix-query {}))
-  ([reader field ^String prefix-query {:keys [contexts analyzer num-hits]}]
+  ([reader field ^String prefix-query {:keys [contexts analyzer max-results]}]
    (let [suggest-field        (str suggest-field-prefix (name field))
          term                 (Term. suggest-field prefix-query)
          analyzer             (or analyzer (>analyzer))
@@ -239,7 +239,7 @@ infrastructure."
          _                    (doseq [context contexts]
                                 (.addContext cq context))
          suggester            (SuggestIndexSearcher. reader)
-         num-hits             (min 10 (or num-hits 10))
+         num-hits             (min 10 (or max-results 10))
          ^TopSuggestDocs hits (.suggest suggester cq num-hits false)]
      (vec
        (for [^ScoreDoc hit (.scoreDocs hits)]
