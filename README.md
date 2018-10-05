@@ -4,6 +4,10 @@ A Clojure wrapper for Apache Lucene.
 
 Note: **UNSTABLE** API. No releases yet.
 
+# Dependency
+    [org.msync/lucene-clj "0.1.0-SNAPSHOT"]
+(Available via [clojars](https://clojars.org/search?q=lucene-clj))
+
 ## What?
 
 Inspired by other example wrappers I've come across.
@@ -20,10 +24,6 @@ When I found out the above inspirations, there were a few aspects that I wanted 
 
 I am sincerely thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
 Bad implementation ideas are my own, of course.
-
-# Dependency
-    [org.msync/lucene-clj "0.1.0-SNAPSHOT"]
-(Available via [clojars](https://clojars.org/search?q=lucene-clj))
 
 ## Usage
 
