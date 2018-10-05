@@ -1,33 +1,25 @@
 (ns msync.lucene
+
   (:require [clojure.java.io :as io]
+            [msync.lucene.document :as d]
             [msync.lucene.query :as query])
+
   (:import [org.apache.lucene.store RAMDirectory Directory FSDirectory]
            [org.apache.lucene.analysis CharArraySet Analyzer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
            [java.util Collection]
            [java.io File]
-           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexableFieldType IndexOptions IndexReader
-                                    DirectoryReader Term]
-           [org.apache.lucene.document Field Document FieldType]
+           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader Term]
            [java.util.logging Logger Level]
            [clojure.lang Sequential]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
-           [org.apache.lucene.search.suggest.document SuggestField Completion50PostingsFormat TopSuggestDocs
-                                                      PrefixCompletionQuery SuggestIndexSearcher ContextSuggestField ContextQuery]
-           [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
+           [org.apache.lucene.search.suggest.document Completion50PostingsFormat TopSuggestDocs
+                                                      PrefixCompletionQuery SuggestIndexSearcher ContextQuery]
+           [org.apache.lucene.codecs.lucene70 Lucene70Codec]
+           [org.apache.lucene.analysis.miscellaneous PerFieldAnalyzerWrapper]
+           [org.apache.lucene.analysis.core KeywordAnalyzer]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
-
-(def ^:private index-options
-  {:full           IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
-   true            IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
-
-   :none           IndexOptions/NONE
-   :nil            IndexOptions/NONE
-   false           IndexOptions/NONE
-
-   :docs-freqs     IndexOptions/DOCS_AND_FREQS
-   :docs-freqs-pos IndexOptions/DOCS_AND_FREQS_AND_POSITIONS})
 
 (defn ^Analyzer >standard-analyzer
   "StandardAnalyzer, with configurable stop-words and case-ignore behavior."
@@ -35,8 +27,14 @@
   ([^Collection stop-words] (>standard-analyzer stop-words true))
   ([^Collection stop-words ^Boolean ignore-case?] (StandardAnalyzer. (CharArraySet. stop-words ignore-case?))))
 
-(def >analyzer >standard-analyzer)
-(def ^:private suggest-field-prefix "$suggest-")
+(defn ^Analyzer >keyword-analyzer [] (KeywordAnalyzer.))
+
+(defn ^PerFieldAnalyzerWrapper >per-field-analyzer-wrapper
+  ([] (PerFieldAnalyzerWrapper. (>standard-analyzer)))
+  ([^Analyzer analyzer] (PerFieldAnalyzerWrapper. analyzer))
+  ([^Analyzer analyzer fa-map] (PerFieldAnalyzerWrapper. analyzer fa-map)))
+
+(defn >analyzer [] (>per-field-analyzer-wrapper))
 
 (defn- >filter-codec-for-suggestions
   "Creates a codec for storing fields that support returning suggestions for given prefix strings.
@@ -46,7 +44,7 @@
   (let [comp-postings-format (Completion50PostingsFormat.)]
     (proxy [Lucene70Codec] []
       (getPostingsFormatForField [field-name]
-        (if (.startsWith field-name suggest-field-prefix)
+        (if (.startsWith field-name d/suggest-field-prefix)
           comp-postings-format
           (proxy-super getPostingsFormatForField field-name))))))
 
@@ -71,57 +69,6 @@
   "An IndexReader instance."
   [^Directory directory]
   (DirectoryReader/open directory))
-
-(defn- ^IndexableFieldType >field-type
-  "FieldType information for the given field."
-  [{:keys [index-type stored?]}]
-  (let [index-option (index-options index-type IndexOptions/NONE)]
-    (doto (FieldType.)
-      (.setIndexOptions index-option)
-      (.setStored stored?))))
-
-
-(defn- ^Field >field
-  "Document Field"
-  [key value opts]
-  {:pre [(not (.startsWith (name key) suggest-field-prefix))]}
-  (let [^FieldType field-type (>field-type opts)
-        value                 (if (keyword? value) (name value) (str value))]
-    (Field. ^String (name key) ^String value field-type)))
-
-(defn- ^SuggestField >suggest-field
-  "Document SuggestField"
-  [key contexts value weight]
-  (let [key                        (str suggest-field-prefix (name key))
-        contexts                   (if (empty? contexts) nil contexts)
-        ^ContextSuggestField field (ContextSuggestField. key value weight contexts)]
-    (.log logger Level/FINEST (str "Created suggest field with name " key " and value " value))
-    field))
-
-(defn map->document [m {:keys [stored-fields indexed-fields suggest-fields context-fn]}]
-  "Convert a map to a Lucene document.
-  Lossy on the way back. Also, string field names come back as keywords."
-  (let [field-keys            (keys m)
-        stored-fields         (or stored-fields (into #{} field-keys))
-        indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
-        suggest-fields        (or suggest-fields {})
-        field-creator         (fn [k]
-                                (>field k (get m k)
-                                        {:index-type (get indexed-fields k false)
-                                         :stored?    (contains? stored-fields k)}))
-        context-fn            (or context-fn (constantly nil))
-        contexts              (context-fn m)
-        suggest-field-creator (fn [[field-name weight]]
-                                (let [value (get m field-name)]
-                                  (>suggest-field field-name contexts value weight)))
-        fields                (map field-creator field-keys)
-        suggest-fields        (map suggest-field-creator suggest-fields)
-        doc                   (Document.)]
-    (doseq [^Field field fields]
-      (.add doc field))
-    (doseq [^SuggestField field suggest-fields]
-      (.add doc field))
-    doc))
 
 (defn ^Directory >memory-index
   "Lucene Directory for transient indexes"
@@ -158,7 +105,7 @@
    map-docs
    {:keys [stored-fields indexed-fields suggest-fields context-fn]}]
   (doseq [document (map
-                     #(map->document %
+                     #(d/map->document %
                                      {:stored-fields  stored-fields
                                       :indexed-fields indexed-fields
                                       :suggest-fields suggest-fields
@@ -166,15 +113,6 @@
     (.addDocument index-writer document)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn document->map [^Document document]
-  "Convenience function.
-  Lucene document to map. Keys are always keywords. Values come back as string.
-  Only stored fields come back."
-  (reduce
-    (fn [m field]
-      (assoc m (-> field .name keyword) (-> field .stringValue)))
-    {}
-    document))
 
 (defmulti ^:private search* #(class (first %&)))
 
@@ -230,7 +168,7 @@ infrastructure."
   ([reader field ^String prefix-query]
    (suggest reader field prefix-query {}))
   ([reader field ^String prefix-query {:keys [contexts analyzer max-results]}]
-   (let [suggest-field        (str suggest-field-prefix (name field))
+   (let [suggest-field        (str d/suggest-field-prefix (name field))
          term                 (Term. suggest-field prefix-query)
          analyzer             (or analyzer (>analyzer))
          pcq                  (PrefixCompletionQuery. analyzer term)
