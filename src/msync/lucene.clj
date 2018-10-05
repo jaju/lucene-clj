@@ -34,7 +34,8 @@
   ([^Analyzer analyzer] (PerFieldAnalyzerWrapper. analyzer))
   ([^Analyzer analyzer fa-map] (PerFieldAnalyzerWrapper. analyzer fa-map)))
 
-(defn >analyzer [] (>per-field-analyzer-wrapper))
+(defn >analyzer [] (>standard-analyzer))
+(def ^:dynamic *analyzer* (>analyzer))
 
 (defn- >filter-codec-for-suggestions
   "Creates a codec for storing fields that support returning suggestions for given prefix strings.
@@ -51,7 +52,7 @@
 (defn- >index-writer-config
   "IndexWriterConfig instance."
   ([]
-   (>index-writer-config (>analyzer)))
+   (>index-writer-config *analyzer*))
   ([^Analyzer analyzer]
    (let [config (IndexWriterConfig. analyzer)]
      (.setCodec config (>filter-codec-for-suggestions))
@@ -87,7 +88,7 @@
   [^Directory directory
    ^Sequential map-docs
    {:keys [analyzer]
-    :or   {analyzer (>analyzer)}
+    :or   {analyzer *analyzer*}
     :as   opts}]
   (let [index-writer-config (>index-writer-config analyzer)
         index-writer        (>index-writer directory index-writer-config)]
@@ -127,7 +128,7 @@
     :or   {results-per-page 10
            max-results      results-per-page
            page             0
-           analyzer         (>analyzer)}}]
+           analyzer         *analyzer*}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
         field-name              (if field-name (name field-name))
         ^Query query            (query/parse query-form {:analyzer analyzer :field-name field-name})
@@ -170,7 +171,7 @@ infrastructure."
   ([reader field ^String prefix-query {:keys [contexts analyzer max-results]}]
    (let [suggest-field        (str d/suggest-field-prefix (name field))
          term                 (Term. suggest-field prefix-query)
-         analyzer             (or analyzer (>analyzer))
+         analyzer             (or analyzer *analyzer*)
          pcq                  (PrefixCompletionQuery. analyzer term)
          cq                   (ContextQuery. pcq)
          contexts             (or contexts [])
