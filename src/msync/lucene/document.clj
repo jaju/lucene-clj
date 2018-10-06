@@ -18,11 +18,13 @@
 
 (defn- ^IndexableFieldType >field-type
   "FieldType information for the given field."
-  [{:keys [index-type stored?]}]
+  [{:keys [index-type stored? tokenize?]
+    :or   {tokenize? true}}]
   (let [index-option (index-options index-type IndexOptions/NONE)]
     (doto (FieldType.)
       (.setIndexOptions index-option)
-      (.setStored stored?))))
+      (.setStored stored?)
+      (.setTokenized tokenize?))))
 
 (defn- ^Field >field
   "Document Field"
@@ -49,17 +51,19 @@
   (doseq [field-value field-values]
     (.add document (field-creator field-meta field-value))))
 
-(defn map->document [m {:keys [stored-fields indexed-fields suggest-fields context-fn]}]
+(defn map->document [m {:keys [string-fields stored-fields indexed-fields suggest-fields context-fn]}]
   "Convert a map to a Lucene document.
   Lossy on the way back. Also, string field names come back as keywords."
   (let [field-keys            (keys m)
+        string-fields         (or string-fields #{})
         stored-fields         (or stored-fields (into #{} field-keys))
         indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
         suggest-fields        (or suggest-fields {})
         field-creator         (fn [k v]
                                 (>field k v
                                         {:index-type (get indexed-fields k false)
-                                         :stored?    (contains? stored-fields k)}))
+                                         :stored?    (contains? stored-fields k)
+                                         :tokenize?  (not (contains? string-fields k))}))
         context-fn            (or context-fn (constantly nil))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
@@ -84,8 +88,12 @@
   Only stored fields come back."
   (reduce
     (fn [m field]
-      (assoc m (-> field .name keyword) (-> field .stringValue)))
+      (let [k          (-> field .name keyword)
+            v          (-> field .stringValue)
+            existing-v (get m k)]
+        (if existing-v
+          (assoc m k (if (string? existing-v) [existing-v v] (conj existing-v v)))
+          (assoc m k v))))
     {}
     document))
-
 

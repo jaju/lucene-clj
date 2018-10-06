@@ -28,7 +28,8 @@
                                           data
                                           {:suggest-fields {:first-name 5}
                                            :context-fn context-fn
-                                           :analyzer analyzer})]
+                                           :analyzer analyzer
+                                           :string-fields #{:age}})]
 
   (alter-var-root #'index' (constantly index))
   ;; This is to hold onto the index when created during REPL-driven development, and this buffer is eval'ed.
@@ -40,7 +41,7 @@
   (deftest basic-search
     (testing "by first name"
       (is (= 1 (count
-                 (lucene/search index "Shikari" {:field-name "first-name"})))))
+                 (lucene/search index "shikari" {:field-name "first-name" :analyzer analyzer})))))
 
     (testing "by last name"
       (is (= 1 (count

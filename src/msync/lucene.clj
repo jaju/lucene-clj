@@ -32,7 +32,9 @@
 (defn ^PerFieldAnalyzerWrapper >per-field-analyzer-wrapper
   ([] (PerFieldAnalyzerWrapper. (>standard-analyzer)))
   ([^Analyzer analyzer] (PerFieldAnalyzerWrapper. analyzer))
-  ([^Analyzer analyzer fa-map] (PerFieldAnalyzerWrapper. analyzer fa-map)))
+  ([^Analyzer analyzer fa-map]
+   (let [fa-map' (reduce (fn [out [k v]] (assoc out (name k) v)) {} fa-map)]
+     (PerFieldAnalyzerWrapper. analyzer fa-map'))))
 
 (defn >analyzer [] (>standard-analyzer))
 (def ^:dynamic *analyzer* (>analyzer))
@@ -104,13 +106,14 @@
 (defmethod index-all! IndexWriter
   [^IndexWriter index-writer
    map-docs
-   {:keys [stored-fields indexed-fields suggest-fields context-fn]}]
+   {:keys [stored-fields indexed-fields suggest-fields string-fields context-fn]}]
   (doseq [document (map
                      #(d/map->document %
                                      {:stored-fields  stored-fields
                                       :indexed-fields indexed-fields
                                       :suggest-fields suggest-fields
-                                      :context-fn     context-fn}) map-docs)]
+                                      :context-fn     context-fn
+                                      :string-fields  string-fields}) map-docs)]
     (.addDocument index-writer document)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -124,11 +127,12 @@
 
 (defmethod search* IndexReader
   [^IndexReader index-store query-form
-   {:keys [field-name results-per-page max-results analyzer page]
+   {:keys [field-name results-per-page max-results analyzer page document-xformer]
     :or   {results-per-page 10
            max-results      results-per-page
            page             0
-           analyzer         *analyzer*}}]
+           analyzer         *analyzer*
+           document-xformer identity}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
         field-name              (if field-name (name field-name))
         ^Query query            (query/parse query-form {:analyzer analyzer :field-name field-name})
@@ -141,7 +145,7 @@
         (let [doc-id (.doc hit)
               doc    (.doc searcher doc-id)
               score  (.score hit)]
-          {:hit doc :score score :doc-id doc-id})))))
+          {:hit (document-xformer doc) :score score :doc-id doc-id})))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn search
@@ -168,7 +172,7 @@ infrastructure."
 (defmethod suggest IndexReader
   ([reader field ^String prefix-query]
    (suggest reader field prefix-query {}))
-  ([reader field ^String prefix-query {:keys [contexts analyzer max-results]}]
+  ([reader field ^String prefix-query {:keys [contexts analyzer max-results document-xformer]}]
    (let [suggest-field        (str d/suggest-field-prefix (name field))
          term                 (Term. suggest-field prefix-query)
          analyzer             (or analyzer *analyzer*)
@@ -179,10 +183,11 @@ infrastructure."
                                 (.addContext cq context))
          suggester            (SuggestIndexSearcher. reader)
          num-hits             (min 10 (or max-results 10))
-         ^TopSuggestDocs hits (.suggest suggester cq num-hits false)]
+         ^TopSuggestDocs hits (.suggest suggester cq num-hits false)
+         document-xformer (or document-xformer identity)]
      (vec
        (for [^ScoreDoc hit (.scoreDocs hits)]
          (let [doc-id (.doc hit)
                doc    (.doc suggester doc-id)
                score  (.score hit)]
-           {:hit doc :score score :doc-id doc-id}))))))
+           {:hit (document-xformer doc) :score score :doc-id doc-id}))))))
