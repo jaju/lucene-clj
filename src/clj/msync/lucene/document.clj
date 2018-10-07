@@ -18,20 +18,20 @@
 
 (defn- ^IndexableFieldType >field-type
   "FieldType information for the given field."
-  [{:keys [index-type stored? tokenize?]
+  [{:keys [index-type store? tokenize?]
     :or   {tokenize? true}}]
   (let [index-option (index-options index-type IndexOptions/NONE)]
     (doto (FieldType.)
       (.setIndexOptions index-option)
-      (.setStored stored?)
+      (.setStored store?)
       (.setTokenized tokenize?))))
 
 (defn- ^Field >field
   "Document Field"
   [key value opts]
   {:pre [(not (.startsWith (name key) suggest-field-prefix))]}
-  (let [^FieldType field-type (>field-type opts)
-        value                 (if (keyword? value) (name value) (str value))]
+  (let [field-type (>field-type opts)
+        value      (if (keyword? value) (name value) (str value))]
     (Field. ^String (name key) ^String value field-type)))
 
 (defn- ^SuggestField >suggest-field
@@ -62,24 +62,18 @@
         field-creator         (fn [k v]
                                 (>field k v
                                         {:index-type (get indexed-fields k false)
-                                         :stored?    (contains? stored-fields k)
+                                         :store?     (contains? stored-fields k)
                                          :tokenize?  (not (contains? string-fields k))}))
         context-fn            (or context-fn (constantly nil))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]
                                   (>suggest-field field-name contexts value weight)))
-        ;fields                (map field-creator field-keys)
-        ;suggest-fields        (map suggest-field-creator suggest-fields)
         doc                   (Document.)]
     (doseq [field-key field-keys]
       (add-fields! doc field-key (get m field-key) field-creator))
     (doseq [[field-key weight] suggest-fields]
       (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
-    #_(doseq [^Field field fields]
-        (.add doc field))
-    #_(doseq [^SuggestField field suggest-fields]
-        (.add doc field))
     doc))
 
 (defn document->map [^Document document]

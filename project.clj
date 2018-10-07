@@ -13,6 +13,9 @@
 
   :aot :all
 
+  :source-paths ["src/clj"]
+  :java-source-paths ["src/java"]
+
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]]
                     :source-paths ["dev"]
                     :resource-paths ["test-resources"]}
