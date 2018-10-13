@@ -73,6 +73,16 @@
   [^Directory directory]
   (DirectoryReader/open directory))
 
+(defmulti delete-all! (fn [arg] (class arg)))
+(defmethod delete-all! Directory
+  [^Directory dir]
+  (let [iw (>index-writer dir)]
+    (delete-all! iw)
+    (.commit iw)))
+(defmethod delete-all! IndexWriter
+  [^IndexWriter iw]
+  (.deleteAll iw))
+
 (defn ^Directory >memory-index
   "Lucene Directory for transient indexes"
   []
@@ -80,9 +90,12 @@
 
 (defn ^Directory >disk-index
   "Persistent index on disk"
-  [^String dir-path]
-  (let [path (.toPath ^File (io/as-file dir-path))]
-    (FSDirectory/open path)))
+  [^String dir-path & {:keys [re-create?] :or {re-create? false}}]
+  (let [path (.toPath ^File (io/as-file dir-path))
+        dir (FSDirectory/open path)]
+    (when re-create?
+      (delete-all! dir))
+    dir))
 
 (defmulti index-all! (fn [store & _] (class store)))
 
