@@ -14,7 +14,7 @@
            [clojure.lang Sequential]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
            [org.apache.lucene.search.suggest.document Completion50PostingsFormat TopSuggestDocs
-                                                      PrefixCompletionQuery SuggestIndexSearcher ContextQuery]
+                                                      PrefixCompletionQuery SuggestIndexSearcher ContextQuery FuzzyCompletionQuery]
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]
            [org.apache.lucene.analysis.miscellaneous PerFieldAnalyzerWrapper]
            [org.apache.lucene.analysis.core KeywordAnalyzer]))
@@ -172,18 +172,21 @@ infrastructure."
 (defmethod suggest IndexReader
   ([reader field ^String prefix-query]
    (suggest reader field prefix-query {}))
-  ([reader field ^String prefix-query {:keys [contexts analyzer max-results document-xformer]}]
+  ([reader field ^String prefix-query {:keys [contexts analyzer max-results document-xformer fuzzy skip-duplicates]
+                                       :or {fuzzy false skip-duplicates false}}]
    (let [suggest-field        (str d/suggest-field-prefix (name field))
          term                 (Term. suggest-field prefix-query)
          analyzer             (or analyzer *analyzer*)
-         pcq                  (PrefixCompletionQuery. analyzer term)
+         pcq                  (if fuzzy
+                                (FuzzyCompletionQuery. analyzer term)
+                                (PrefixCompletionQuery. analyzer term))
          cq                   (ContextQuery. pcq)
          contexts             (or contexts [])
          _                    (doseq [context contexts]
                                 (.addContext cq context))
          suggester            (SuggestIndexSearcher. reader)
          num-hits             (min 10 (or max-results 10))
-         ^TopSuggestDocs hits (.suggest suggester cq num-hits false)
+         ^TopSuggestDocs hits (.suggest suggester cq num-hits skip-duplicates)
          document-xformer (or document-xformer identity)]
      (vec
        (for [^ScoreDoc hit (.scoreDocs hits)]
