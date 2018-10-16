@@ -1,4 +1,5 @@
-(ns msync.lucene.utils)
+(ns msync.lucene.utils
+  (:import [org.apache.lucene.util BytesRef]))
 
 (defn docfields-vecs-to-maps
   "Seq of documents, each a vector.
@@ -13,3 +14,9 @@
                     (map keyword)
                     repeat)
         doc-vecs)))
+
+(defn string->bytes-ref [^String s]
+  (BytesRef. (.getBytes s "UTF-8")))
+
+(defn bytes-ref->string [^BytesRef b]
+  (.utf8ToString b))

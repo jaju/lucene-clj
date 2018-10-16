@@ -18,7 +18,7 @@
            [org.apache.lucene.analysis.miscellaneous PerFieldAnalyzerWrapper]
            [org.apache.lucene.analysis.core KeywordAnalyzer]
            [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
-           [org.apache.lucene.search.suggest InputIterator]))
+           [org.apache.lucene.search.suggest InputIterator Lookup]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
 
@@ -170,19 +170,6 @@
    (search* store query-form opts)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn >infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
-                                                                       :or   {suggester-class :infix}}]
-  (let [index (cond
-                (string? path) (>disk-index path :re-create? true)
-                (= :memory path) (>memory-index))
-        suggester (case suggester-class
-                    :infix (AnalyzingInfixSuggester. index analyzer)
-                    :blended-infix (BlendedInfixSuggester. index analyzer))]
-    (.build suggester doc-maps-iterator)
-    suggester))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti suggest
           "Return suggestions for prefix-queries. The index should have been created with
 appropriate configuration for which fields should be analyzed for creating the suggestions
@@ -216,3 +203,28 @@ infrastructure."
                :document-xformer document-xformer
                :contexts         contexts}]
      (su/suggest reader (name field-name) prefix-query opts))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn >infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
+                                                                       :or   {suggester-class :infix}}]
+  (let [index (cond
+                (string? path) (>disk-index path :re-create? true)
+                (= :memory path) (>memory-index))
+        suggester (case suggester-class
+                    :infix (AnalyzingInfixSuggester. index analyzer)
+                    :blended-infix (BlendedInfixSuggester. index analyzer))]
+    (.build suggester doc-maps-iterator)
+    suggester))
+
+(defn lookup
+  "lookup - because using suggest feels wrong after looking at the underlying implementation,
+  which uses lookup."
+  [^Lookup suggester prefix & {:keys [contexts max-results result-xformer match-all?]
+                               :or   {result-xformer identity
+                                      match-all? false
+                                      max-results 10}}]
+  (let [results (if contexts
+                  (.lookup suggester prefix contexts match-all? max-results)
+                  (.lookup suggester prefix max-results match-all? false))]
+    (map result-xformer results)))

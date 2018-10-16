@@ -1,6 +1,6 @@
 (ns user
   (:require [clojure.data.csv :as csv]
-            [msync.lucene :as lucene])
+            #_[msync.lucene :as lucene])
   (:import [org.apache.lucene.index Term]
            [org.apache.lucene.search.suggest.document PrefixCompletionQuery SuggestIndexSearcher Completion50PostingsFormat]
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
@@ -23,10 +23,10 @@
         (Completion50PostingsFormat.)
         (proxy-super getPostingsFormatForField field-name)))))
 
-(defn comp-iw-config> []
-  (let [c (#'lucene/>index-writer-config)]
-    (.setCodec c (>filter-codec))
-    c))
+#_(defn comp-iw-config> []
+    (let [c (#'lucene/>index-writer-config)]
+      (.setCodec c (>filter-codec))
+      c))
 
 (comment
   (def mem-dir (lucene/>memory-index))

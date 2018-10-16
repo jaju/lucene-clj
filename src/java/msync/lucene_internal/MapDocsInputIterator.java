@@ -11,8 +11,8 @@ import java.util.Set;
 
 public class MapDocsInputIterator implements InputIterator {
 
-    private final Map<Keyword, IFn> _actions;
-    private final Object _state;
+    public final Map<Keyword, IFn> _actions;
+    public final Object _state;
 
     final Keyword WEIGHT = Keyword.intern("weight");
     final Keyword HAS_PAYLOAD = Keyword.intern("payload?");
