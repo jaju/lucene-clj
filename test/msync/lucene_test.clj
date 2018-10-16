@@ -2,6 +2,7 @@
   (:require [clojure.test :refer :all]
             [clojure.java.io :as io]
             [clojure.data.csv :as csv]
+            [msync.tests-common :refer :all]
             [msync.lucene :as lucene]
             [msync.lucene.utils :as utils]
             [clojure.string :as string]
@@ -16,14 +17,8 @@
        (map string/lower-case)
        into-array))
 
-(let [data             (-> "sample-data.csv"
-                           io/resource
-                           slurp
-                           csv/read-csv
-                           utils/docfields-vecs-to-maps)
-
+(let [data             sample-data
       index            (lucene/>memory-index)
-
       _                (lucene/index-all! index
                                           data
                                           {:suggest-fields {:first-name 5}

@@ -1,23 +1,24 @@
 (ns msync.lucene
-
   (:require [clojure.java.io :as io]
+            [msync.lucene.input-iterator]
             [msync.lucene.document :as d]
-            [msync.lucene.query :as query])
-
+            [msync.lucene.query :as query]
+            [msync.lucene.suggestions :as su])
   (:import [org.apache.lucene.store RAMDirectory Directory FSDirectory]
            [org.apache.lucene.analysis CharArraySet Analyzer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
            [java.util Collection]
            [java.io File]
-           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader Term]
+           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader]
            [java.util.logging Logger Level]
            [clojure.lang Sequential]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
-           [org.apache.lucene.search.suggest.document Completion50PostingsFormat TopSuggestDocs
-                                                      PrefixCompletionQuery SuggestIndexSearcher ContextQuery FuzzyCompletionQuery]
+           [org.apache.lucene.search.suggest.document Completion50PostingsFormat]
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]
            [org.apache.lucene.analysis.miscellaneous PerFieldAnalyzerWrapper]
-           [org.apache.lucene.analysis.core KeywordAnalyzer]))
+           [org.apache.lucene.analysis.core KeywordAnalyzer]
+           [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
+           [org.apache.lucene.search.suggest InputIterator]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
 
@@ -83,6 +84,7 @@
   [^IndexWriter iw]
   (.deleteAll iw))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn ^Directory >memory-index
   "Lucene Directory for transient indexes"
   []
@@ -97,6 +99,7 @@
       (delete-all! dir))
     dir))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti index-all! (fn [store & _] (class store)))
 
 (defmethod index-all! Directory
@@ -129,8 +132,7 @@
                                       :string-fields  string-fields}) map-docs)]
     (.addDocument index-writer document)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti ^:private search* #(class (first %&)))
 
 (defmethod search* Directory
@@ -160,14 +162,27 @@
               score  (.score hit)]
           {:hit (document-xformer doc) :score score :doc-id doc-id})))))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn search
   ([store query-form]
    (search store query-form {}))
   ([store query-form opts]
    (search* store query-form opts)))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(defn >infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
+                                                                       :or   {suggester-class :infix}}]
+  (let [index (cond
+                (string? path) (>disk-index path :re-create? true)
+                (= :memory path) (>memory-index))
+        suggester (case suggester-class
+                    :infix (AnalyzingInfixSuggester. index analyzer)
+                    :blended-infix (BlendedInfixSuggester. index analyzer))]
+    (.build suggester doc-maps-iterator)
+    suggester))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti suggest
           "Return suggestions for prefix-queries. The index should have been created with
 appropriate configuration for which fields should be analyzed for creating the suggestions
@@ -176,34 +191,28 @@ infrastructure."
 
 (defmethod suggest Directory
 
-  ([directory field prefix-query]
-   (suggest directory field prefix-query {}))
-  ([directory field prefix-query opts]
+  ([directory field-name prefix-query]
+   (suggest directory field-name prefix-query {}))
+  ([directory field-name prefix-query opts]
    (with-open [reader (>index-reader directory)]
-     (suggest reader field prefix-query opts))))
+     (suggest reader field-name prefix-query opts))))
 
 (defmethod suggest IndexReader
-  ([reader field ^String prefix-query]
-   (suggest reader field prefix-query {}))
-  ([reader field ^String prefix-query {:keys [contexts analyzer max-results document-xformer fuzzy skip-duplicates]
-                                       :or {fuzzy false skip-duplicates false}}]
-   (let [suggest-field        (str d/suggest-field-prefix (name field))
-         term                 (Term. suggest-field prefix-query)
-         analyzer             (or analyzer *analyzer*)
-         pcq                  (if fuzzy
-                                (FuzzyCompletionQuery. analyzer term)
-                                (PrefixCompletionQuery. analyzer term))
-         cq                   (ContextQuery. pcq)
-         contexts             (or contexts [])
-         _                    (doseq [context contexts]
-                                (.addContext cq context))
-         suggester            (SuggestIndexSearcher. reader)
-         num-hits             (min 10 (or max-results 10))
-         ^TopSuggestDocs hits (.suggest suggester cq num-hits skip-duplicates)
-         document-xformer (or document-xformer identity)]
-     (vec
-       (for [^ScoreDoc hit (.scoreDocs hits)]
-         (let [doc-id (.doc hit)
-               doc    (.doc suggester doc-id)
-               score  (.score hit)]
-           {:hit (document-xformer doc) :score score :doc-id doc-id}))))))
+  ([reader field-name ^String prefix-query]
+   (suggest reader field-name prefix-query {}))
+  ([reader
+    field-name
+    ^String prefix-query
+    {:keys [analyzer max-results document-xformer fuzzy skip-duplicates contexts]
+     :or   {fuzzy            false
+            skip-duplicates  false
+            analyzer         *analyzer*
+            max-results      10
+            document-xformer identity}}]
+   (let [opts {:fuzzy            fuzzy
+               :skip-duplicates  skip-duplicates
+               :analyzer         analyzer
+               :max-results      max-results
+               :document-xformer document-xformer
+               :contexts         contexts}]
+     (su/suggest reader (name field-name) prefix-query opts))))

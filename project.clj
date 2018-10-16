@@ -13,8 +13,8 @@
 
   :aot :all
 
-  :source-paths ["src/clj"]
   :java-source-paths ["src/java"]
+  :source-paths ["src/clj"]
 
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]]
                     :source-paths ["dev"]
