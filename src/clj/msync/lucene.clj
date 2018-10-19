@@ -99,6 +99,14 @@
       (delete-all! dir))
     dir))
 
+(defn ^Directory >index
+  "Create an appropriate index - where path is either the keyword :memory, or
+  a string representing the path on disk where the index is created."
+  [path & {:as opts}]
+  (if (= path :memory)
+    (>memory-index)
+    (>disk-index opts)))
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti index-all! (fn [store & _] (class store)))
 
@@ -208,9 +216,7 @@ infrastructure."
 
 (defn >infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
                                                                        :or   {suggester-class :infix}}]
-  (let [index (cond
-                (string? path) (>disk-index path :re-create? true)
-                (= :memory path) (>memory-index))
+  (let [index (>index path :re-create? true)
         suggester (case suggester-class
                     :infix (AnalyzingInfixSuggester. index analyzer)
                     :blended-infix (BlendedInfixSuggester. index analyzer))]

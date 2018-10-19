@@ -76,18 +76,28 @@
       (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
     doc))
 
-(defn document->map [^Document document]
+(defn- field->kv [^Field f]
+  [(-> f .name keyword) (.stringValue f)])
+
+(defn- update-conj [m k v]
+  (assoc m k (conj (m k []) v)))
+
+(defn document->map
   "Convenience function.
   Lucene document to map. Keys are always keywords. Values come back as string.
   Only stored fields come back."
-  (reduce
-    (fn [m field]
-      (let [k          (-> field .name keyword)
-            v          (-> field .stringValue)
-            existing-v (get m k)]
-        (if existing-v
-          (assoc m k (if (string? existing-v) [existing-v v] (conj existing-v v)))
-          (assoc m k v))))
-    {}
-    document))
-
+  [^Document document & {:keys [fields-to-keep multi-fields]
+                         :or   {multi-fields #{} fields-to-keep :all}}]
+  (let [fields-to-keep (if (= :all fields-to-keep)
+                         (constantly true)
+                         fields-to-keep)]
+    (reduce
+      (fn [m ^Field field]
+        (let [[k v] (field->kv field)]
+          (if (fields-to-keep k)
+            (if (multi-fields k)
+              (update-conj m k v)
+              (assoc m k v))
+            m)))
+      {}
+      document)))
