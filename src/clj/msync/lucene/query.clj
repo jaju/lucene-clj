@@ -1,6 +1,6 @@
 (ns msync.lucene.query
   (:import
-    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur BooleanClause]
+    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur]
     [clojure.lang Sequential IPersistentSet IPersistentMap IMapEntry]
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]
@@ -21,7 +21,7 @@
       [v (assoc opts :field-name (name k))])
     [subexp opts]))
 
-(defn- combine-query-subexps [subexps opts ^BooleanClause$Occur occur-condition]
+(defn- combine-subexps [subexps opts ^BooleanClause$Occur occur-condition]
   (let [qb (BooleanQuery$Builder.)]
     (doseq [q (keep (fn [e]
                       (let [[updated-e updated-opts] (query-subexp-meta-process e opts)]
@@ -37,15 +37,15 @@
 
   Sequential
   (parse [subexps-coll opts]
-    (combine-query-subexps subexps-coll opts BooleanClause$Occur/MUST))
+    (combine-subexps subexps-coll opts BooleanClause$Occur/MUST))
 
   IPersistentSet
   (parse [subexps-set opts]
-    (combine-query-subexps subexps-set opts BooleanClause$Occur/SHOULD))
+    (combine-subexps subexps-set opts BooleanClause$Occur/SHOULD))
 
   IPersistentMap
   (parse [field-wise-supexps opts]
-    (combine-query-subexps field-wise-supexps opts BooleanClause$Occur/MUST))
+    (combine-subexps field-wise-supexps opts BooleanClause$Occur/MUST))
 
   String
   (parse [str-query {:keys [^Analyzer analyzer field-name query-type]}]

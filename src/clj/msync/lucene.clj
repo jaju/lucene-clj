@@ -1,10 +1,12 @@
 (ns msync.lucene
   (:require [clojure.java.io :as io]
-            [msync.lucene.input-iterator]
-            [msync.lucene.document :as d]
-            [msync.lucene.query :as query]
-            [msync.lucene.suggestions :as su])
-  (:import [org.apache.lucene.store RAMDirectory Directory FSDirectory]
+            [msync.lucene
+             [input-iterator]
+             [document :as d]
+             [query :as query]
+             [suggestions :as su]
+             [utils :as utils]])
+  (:import [org.apache.lucene.store Directory FSDirectory MMapDirectory]
            [org.apache.lucene.analysis CharArraySet Analyzer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
            [java.util Collection]
@@ -88,7 +90,10 @@
 (defn ^Directory >memory-index
   "Lucene Directory for transient indexes"
   []
-  (RAMDirectory.))
+  (let [temp-path (utils/temp-path :delete-on-exit? true)
+        d (MMapDirectory. temp-path)]
+    (utils/delete-on-exit! d)
+    d))
 
 (defn ^Directory >disk-index
   "Persistent index on disk"
