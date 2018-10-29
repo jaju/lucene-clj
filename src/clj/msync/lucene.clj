@@ -9,7 +9,7 @@
   (:import [org.apache.lucene.store Directory FSDirectory MMapDirectory]
            [org.apache.lucene.analysis CharArraySet Analyzer]
            [org.apache.lucene.analysis.standard StandardAnalyzer]
-           [java.util Collection]
+           [java.util Collection Set]
            [java.io File]
            [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader]
            [java.util.logging Logger Level]
@@ -231,7 +231,10 @@ infrastructure."
 (defn lookup
   "lookup - because using suggest feels wrong after looking at the underlying implementation,
   which uses lookup."
-  [^Lookup suggester prefix & {:keys [contexts max-results result-xformer match-all?]
+  [^Lookup suggester prefix & {:keys [^Set contexts
+                                      ^int max-results
+                                      result-xformer
+                                      ^boolean match-all?]
                                :or   {result-xformer identity
                                       match-all? false
                                       max-results 10}}]

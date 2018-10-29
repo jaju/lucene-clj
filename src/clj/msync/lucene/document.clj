@@ -38,7 +38,7 @@
   "Document SuggestField"
   [key contexts value weight]
   (let [key                        (str suggest-field-prefix (name key))
-        contexts                   (if (empty? contexts) nil contexts)
+        contexts                   (if (empty? contexts) #{} contexts)
         ^ContextSuggestField field (ContextSuggestField. key value weight contexts)]
     field))
 
