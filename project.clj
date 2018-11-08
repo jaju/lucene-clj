@@ -1,6 +1,6 @@
 (def lucene-version "7.5.0")
 
-(defproject org.msync/lucene-clj "0.1.0-SNAPSHOT"
+(defproject org.msync/lucene-clj "0.1.0"
   :description "Lucene bindings for Clojure"
   :url "https://github.com/jaju/lucene-clj"
   :license {:name "Eclipse Public License"
