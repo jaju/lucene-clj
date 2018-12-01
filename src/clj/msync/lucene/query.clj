@@ -59,7 +59,7 @@
         :phrase-query (.createPhraseQuery builder (name field-name) str-query)
         (throw (ex-info (str "Unsupported query type - " (name query-type)) {:query-type query-type}))))))
 
-(defn parse-dsl
+(defn ^Query parse-dsl
   ([^String dsl ^Analyzer analyzer]
    (parse-dsl dsl "" analyzer))
   ([^String dsl ^String default-field-name ^Analyzer analyzer]

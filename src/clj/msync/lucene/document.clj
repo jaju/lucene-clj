@@ -3,6 +3,8 @@
            [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
            [org.apache.lucene.document FieldType Field Document]))
 
+(def suggest-field-prefix "$suggest-")
+
 (def ^:private index-options
   {:full           IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
    true            IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
@@ -14,31 +16,29 @@
    :docs-freqs     IndexOptions/DOCS_AND_FREQS
    :docs-freqs-pos IndexOptions/DOCS_AND_FREQS_AND_POSITIONS})
 
-(def suggest-field-prefix "$suggest-")
-
-(defn- ^IndexableFieldType >field-type
-  "FieldType information for the given field."
+(defn- ^IndexableFieldType create-field-type
   [{:keys [index-type store? tokenize?]
     :or   {tokenize? true}}]
-  (let [index-option (index-options index-type IndexOptions/NONE)]
+  (let [opts (index-options index-type IndexOptions/NONE)]
     (doto (FieldType.)
-      (.setIndexOptions index-option)
+      (.setIndexOptions opts)
       (.setStored store?)
       (.setTokenized tokenize?))))
 
-(defn- ^Field >field
+(defn- ^Field create-field
   "Document Field"
   [key value opts]
   {:pre [(not (.startsWith (name key) suggest-field-prefix))]}
-  (let [field-type (>field-type opts)
+  (let [field-type (create-field-type opts)
         value      (if (keyword? value) (name value) (str value))]
     (Field. ^String (name key) ^String value field-type)))
 
-(defn- ^SuggestField >suggest-field
+(defn- ^SuggestField create-suggestible-field
   "Document SuggestField"
   [key contexts value weight]
   (let [key                        (str suggest-field-prefix (name key))
         contexts                   (if (empty? contexts) #{} contexts)
+        contexts                   (into-array contexts)
         ^ContextSuggestField field (ContextSuggestField. key value weight contexts)]
     field))
 
@@ -60,15 +60,15 @@
         indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
         suggest-fields        (or suggest-fields {})
         field-creator         (fn [k v]
-                                (>field k v
-                                        {:index-type (get indexed-fields k false)
-                                         :store?     (contains? stored-fields k)
-                                         :tokenize?  (not (contains? string-fields k))}))
+                                (create-field k v
+                                  {:index-type (get indexed-fields k :none)
+                                   :store?     (contains? stored-fields k)
+                                   :tokenize?  (not (contains? string-fields k))}))
         context-fn            (or context-fn (constantly nil))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]
-                                  (>suggest-field field-name contexts value weight)))
+                                  (create-suggestible-field field-name contexts value weight)))
         doc                   (Document.)]
     (doseq [field-key field-keys]
       (add-fields! doc field-key (get m field-key) field-creator))

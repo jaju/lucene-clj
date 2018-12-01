@@ -21,7 +21,9 @@
     (lucene-dir-deleter d))
   (reset! deletable-directory-list #{}))
 
-(.addShutdownHook (Runtime/getRuntime) (proxy [Thread] [] (run [] (delete-marked-lucene-directories!))))
+(.addShutdownHook (Runtime/getRuntime)
+  (proxy [Thread] []
+    (run [] (delete-marked-lucene-directories!))))
 
 (defn temp-path [& {:keys [prefix]
                     :or {prefix "msync-lucene"}}]

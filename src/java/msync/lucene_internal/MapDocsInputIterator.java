@@ -11,19 +11,19 @@ import java.util.Set;
 
 public class MapDocsInputIterator implements InputIterator {
 
-    public final Map<Keyword, IFn> _actions;
-    public final Object _state;
+    private final Map<Keyword, IFn> _actions;
+    private final Object _state;
 
-    final Keyword WEIGHT = Keyword.intern("weight");
-    final Keyword HAS_PAYLOAD = Keyword.intern("payload?");
-    final Keyword PAYLOAD = Keyword.intern("payload");
-    final Keyword HAS_CONTEXTS = Keyword.intern("contexts?");
-    final Keyword CONTEXTS = Keyword.intern("contexts");
-    final Keyword NEXT = Keyword.intern("next");
+    private final Keyword WEIGHT = Keyword.intern("weight");
+    private final Keyword HAS_PAYLOAD = Keyword.intern("payload?");
+    private final Keyword PAYLOAD = Keyword.intern("payload");
+    private final Keyword HAS_CONTEXTS = Keyword.intern("contexts?");
+    private final Keyword CONTEXTS = Keyword.intern("contexts");
+    private final Keyword NEXT = Keyword.intern("next");
 
     public MapDocsInputIterator(Map<Keyword, IFn> actions, Object state) {
-        _state = state;
         _actions = actions;
+        _state = state;
     }
 
     @Override
