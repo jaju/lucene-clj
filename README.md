@@ -5,7 +5,7 @@ A Clojure wrapper for Apache Lucene.
 Note: **UNSTABLE** API. No releases yet.
 
 # Dependency
-    [org.msync/lucene-clj "0.1.0-SNAPSHOT"]
+    [org.msync/lucene-clj "0.2.0-SNAPSHOT"]
 (Available via [clojars](https://clojars.org/search?q=lucene-clj))
 
 ## What?
@@ -29,7 +29,7 @@ Bad implementation ideas are my own, of course.
 
 _To be completed_. 
 
-Note: There are some samples to look at in the tests as well. A sample data-set exists in [here](test-resources/sample-data.csv),
+Note: There are some samples to look at in the tests as well. A sample data-set exists in [here](test-resources/sample-data.csv) and [here](test-resources/albumlist.csv),
 which is used in the tests.
 
 _Given_
@@ -42,14 +42,14 @@ _Given_
 
 #### Create an index
 ```clojure
-(def idx (lucene/>memory-index)) ; In-memory index
+(def store (lucene/create-store :memory)) ; In-memory index
 ; OR
-(def idx (lucene/>disk-index "/path/to/index/directory")) ; On disk
+(def store (lucene/create-store "/path/to/index/directory")) ; On disk
 ```
 
 #### Index a document. Use Clojure maps
 ```clojure
-(lucene/index-all! idx
+(lucene/index! store
                    [{:name "Ram" :description "A just king. Ethical. Read more in Ramayan."}
                     {:name "Ravan" :description "A scary king. Ethical villain. Read more in Ramayan."}
                     {:name "Krishna" :description "An adorable king. Pragmatic. Read about him in the Mahabharat."}]
@@ -66,38 +66,35 @@ These function calls return a sequence of maps with the following structure for 
 
 There's a convenience function to convert the Lucene _Document_ object to a Clojure map.
 ```clojure
-(lucene/document->map (:hit 'one-response))
+(require '[msync.lucene.document :as d])
+(d/document->map (:hit 'one-response))
 ;; In bulk
-(->> (lucene/search idx "query-string" {:field-name "field-name-to-search-in"})
+(->> (lucene/search store "query-string" {:field-name "field-name-to-search-in"})
      (map :hit)
-     (map lucene/document->map))
+     (map d/document->map))
 ```
 
 #### Search
 ```clojure
-(lucene/search idx "Ram" {:field-name :name})
-; The same as
-(lucene/search idx {:name "Ram"})
+(lucene/search store {:name "Ram"})
 
 ;; Search for either Ram or Krishna
-(lucene/search idx {:name #{"Krishna" "Ram"}})
+(lucene/search store {:name #{"Krishna" "Ram"}})
 ```
 
 #### Phrase search
 ```clojure
 ;; Space(s) in the query string are inferred to mean a phrase search operation
-(lucene/search idx "read more" {:field-name "description"})
-;; The same as
 (lucene/search idx {:description "read more"})
 ```
 
 #### Suggestion
 ```clojure
-(lucene/suggest idx :name "Ra")
+(lucene/suggest store :name "Ra")
 ```
 
 ## Sample Datasets
-1. [Albums - Kaggle](https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone)
+1. [Albums - Kaggle](https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone) - [local](test-resources/albumlist.csv)
 2. [Hand-created, real + fictional characters](test-resources/sample-data.csv)
 
 ## License
