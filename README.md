@@ -1,8 +1,11 @@
 # org.msync/lucene-clj [![Build Status](https://secure.travis-ci.org/jaju/lucene-clj.png)](http://travis-ci.org/jaju/lucene-clj)
 
 A Clojure wrapper for Apache Lucene.
+The primary use-case is for in-process text search needs for *read-only* datasets that can be managed on single-instance deployments. Because for multi-instance deployments, keeping modifications of data in sync will be hard. In other words, when you need light-weight text-search support without the hassle of setting up something like Solr.
 
-Note: **UNSTABLE** API. No releases yet.
+Both in-memory, and on-disk indexes can be used depending on the dataset size.
+
+Note: **UNSTABLE** API. No releases yet, but coming soon.
 
 # Dependency
     [org.msync/lucene-clj "0.2.0-SNAPSHOT"]
