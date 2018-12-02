@@ -16,24 +16,35 @@
 (comment
 
 
-  (defonce postal-data (-> "pincode-data-26022018.csv"
-                         io/resource
-                         slurp
-                         csv/read-csv
-                         utils/docfields-vecs-to-maps))
+  (defonce album-data (-> "albumlist.csv"
+                        io/resource
+                        slurp
+                        csv/read-csv
+                        utils/docfields-vecs-to-maps))
 
-  (first postal-data)
+  (first album-data)
   (defonce default-analyzer (analyzers/create-default-analyzer))
   (defonce keyword-analyzer (analyzers/create-keyword-analyzer))
 
-  (defonce postal-data-analyzer
+  (defonce album-data-analyzer
     (analyzers/create-per-field-analyzer default-analyzer
-      {:delivery-status keyword-analyzer
-       :pincode keyword-analyzer}))
+      {:Year keyword-analyzer
+       :Genre keyword-analyzer
+       :Subgenre keyword-analyzer}))
 
-  (def index (lucene/create-store :memory :analyzer postal-data-analyzer))
+  (def index (lucene/create-store :memory :analyzer album-data-analyzer))
+  (-> index :directory .close)
 
-  (lucene/index! index postal-data {:analyzer postal-data-analyzer})
+  (lucene/index! index album-data {:analyzer album-data-analyzer
+                                   ;:context-fn (fn [d] [(:state d)])
+                                   :suggest-fields {:Album 1 :Artist 1}})
   (lucene/delete-all! index)
 
-  (lucene/search index {:state "maharashtra"} {:analyzer postal-data-analyzer}))
+  (lucene/search index {:Year "1967"} {:results-per-page 5
+                                       :hit->doc #(-> %
+                                                    ld/document->map
+                                                    (select-keys [:Year :Album :Artist :Subgenre]))})
+
+  (lucene/suggest index :Album "fore" {:hit->doc ld/document->map :fuzzy? true})
+  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true}))
+

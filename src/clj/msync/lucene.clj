@@ -11,12 +11,13 @@
            [org.apache.lucene.analysis Analyzer]
            [java.util Set]
            [java.io File]
-           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader]
+           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader Term]
            [java.util.logging Logger Level]
            [clojure.lang Sequential IObj]
-           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc]
+           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc FuzzyQuery BooleanQuery$Builder BooleanClause$Occur]
            [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
-           [org.apache.lucene.search.suggest InputIterator Lookup]))
+           [org.apache.lucene.search.suggest InputIterator Lookup]
+           [org.apache.lucene.queryparser.xml.builders BooleanQueryBuilder]))
 
 (defonce logger (Logger/getLogger "msync.lucene"))
 (defrecord ^:private Store [directory analyzer])
@@ -118,6 +119,15 @@
     (doseq [document (map doc-fn doc-maps)]
       (.addDocument index-writer document))))
 
+(defn create-fuzzy-query [fld ^String val]
+  (let [term (Term. ^String (name fld) val)]
+    (FuzzyQuery. term)))
+
+(defn combine-fuzzy-queries [m]
+  (let [b (BooleanQuery$Builder.)]
+    (doseq [[k v] m]
+      (.add b (create-fuzzy-query k v) BooleanClause$Occur/SHOULD))
+    (.build b)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti ^:private search* #(class (first %&)))
 
@@ -128,14 +138,19 @@
 
 (defmethod search* IndexReader
   [^IndexReader index-store query-form
-   {:keys [field-name results-per-page max-results analyzer hit->doc page]
+   {:keys [field-name results-per-page max-results analyzer hit->doc page fuzzy?]
     :or   {results-per-page 10
            max-results      results-per-page
            page             0
-           hit->doc         identity}}]
+           hit->doc         identity
+           fuzzy?           false}}]
   (let [^IndexSearcher searcher (IndexSearcher. index-store)
         field-name              (if field-name (name field-name))
-        ^Query query            (query/parse query-form {:analyzer analyzer :field-name field-name})
+        ^Query query            (if fuzzy?
+                                  (let [term (Term. ^String field-name ^String (str query-form))]
+                                    (println (str "Here with " term))
+                                    (combine-fuzzy-queries query-form))
+                                  (query/parse query-form {:analyzer analyzer :field-name field-name}))
         ^TopDocs hits           (.search searcher query (int max-results))
         start                   (* page results-per-page)
         end                     (min (+ start results-per-page) max-results (.totalHits hits))]
@@ -178,12 +193,12 @@ infrastructure."
    (suggest index-reader field-name prefix-query {}))
 
   ([index-reader field-name ^String prefix-query
-    {:keys [analyzer max-results document-xformer fuzzy? skip-duplicates? contexts]}]
+    {:keys [analyzer max-results hit->doc fuzzy? skip-duplicates? contexts]}]
    (let [opts {:fuzzy?           (or fuzzy? false)
                :skip-duplicates? (or skip-duplicates? false)
                :analyzer         (or analyzer *analyzer*)
                :max-results      (or max-results 10)
-               :document-xformer (or document-xformer identity)
+               :hit->doc (or hit->doc identity)
                :contexts         contexts}]
      (su/suggest index-reader (name field-name) prefix-query opts))))
 

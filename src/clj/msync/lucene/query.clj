@@ -1,10 +1,11 @@
 (ns msync.lucene.query
   (:import
-    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur]
+    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur FuzzyQuery]
     [clojure.lang Sequential IPersistentSet IPersistentMap IMapEntry]
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]
-    [org.apache.lucene.queryparser.classic QueryParser]))
+    [org.apache.lucene.queryparser.classic QueryParser]
+    [org.apache.lucene.index Term]))
 
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
@@ -48,8 +49,7 @@
     (combine-subexps field-wise-supexps opts BooleanClause$Occur/MUST))
 
   String
-  (parse [str-query {:keys [^Analyzer analyzer field-name query-type]}]
-    {:pre [(not-empty field-name) (not (nil? analyzer))]}
+  (parse [str-query {:keys [^Analyzer analyzer field-name query-type fuzzy?]}]
     (let [builder    (QueryBuilder. analyzer)
           query-type (or query-type (if (re-find #"\s" str-query)
                                       :phrase-query

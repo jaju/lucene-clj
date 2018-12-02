@@ -36,13 +36,14 @@
 (defn- ^SuggestField create-suggestible-field
   "Document SuggestField"
   [key contexts value weight]
-  (let [key                        (str suggest-field-prefix (name key))
-        contexts                   (if (empty? contexts) #{} contexts)
-        contexts                   (into-array contexts)
-        ^ContextSuggestField field (ContextSuggestField. key value weight contexts)]
+  (let [key                 (str suggest-field-prefix (name key))
+        ^SuggestField field (if (empty? contexts)
+                              (SuggestField. key value weight)
+                              (ContextSuggestField. key value weight (into-array String contexts)))]
     field))
 
-(defmulti ^:private add-fields! (fn [document field-meta field-value field-creator] (sequential? field-value)))
+(defmulti ^:private add-fields!
+  (fn [document field-meta field-value field-creator] (sequential? field-value)))
 (defmethod add-fields! false
   [document field-meta field-value field-creator]
   (.add document (field-creator field-meta field-value)))
@@ -64,7 +65,7 @@
                                   {:index-type (get indexed-fields k :none)
                                    :store?     (contains? stored-fields k)
                                    :tokenize?  (not (contains? string-fields k))}))
-        context-fn            (or context-fn (constantly nil))
+        context-fn            (or context-fn (constantly []))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]

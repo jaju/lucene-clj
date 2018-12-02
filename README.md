@@ -96,6 +96,10 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 (lucene/suggest idx :name "Ra")
 ```
 
+## Sample Datasets
+1. [Albums - Kaggle](https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone)
+2. [Hand-created, real + fictional characters](test-resources/sample-data.csv)
+
 ## License
 
 Copyright © 2018 Ravindra R. Jaju
