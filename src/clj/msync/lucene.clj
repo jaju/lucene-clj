@@ -13,26 +13,26 @@
            [java.io File]
            [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader Term]
            [java.util.logging Logger Level]
-           [clojure.lang Sequential IObj]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc FuzzyQuery BooleanQuery$Builder BooleanClause$Occur]
            [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
-           [org.apache.lucene.search.suggest InputIterator Lookup]
-           [org.apache.lucene.queryparser.xml.builders BooleanQueryBuilder]))
+           [org.apache.lucene.search.suggest InputIterator Lookup]))
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defonce logger (Logger/getLogger "msync.lucene"))
 (defrecord ^:private Store [directory analyzer])
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(def ^:dynamic *analyzer* (a/create-default-analyzer))
+
+(defonce default-analyzer (a/standard-analyzer))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn- create-index-writer-config
   "IndexWriterConfig instance."
 
-  ([] (create-index-writer-config *analyzer*))
+  ([] (create-index-writer-config default-analyzer))
 
   ([^Analyzer analyzer]
    (let [config (IndexWriterConfig. analyzer)]
-     (.setCodec config (su/>filter-codec-for-suggestions))
+     (.setCodec config (su/create-filter-codec-for-suggestions))
      config)))
 
 (defn- ^IndexWriter create-index-writer
@@ -68,7 +68,7 @@
 (defn- ^Directory create-memory-index
   "Lucene Directory for transient indexes"
   []
-  (let [temp-path (utils/temp-path :delete-on-exit? true)
+  (let [temp-path (utils/temp-path)
         d         (MMapDirectory. temp-path)]
     (utils/delete-on-exit! d)
     d))
@@ -196,7 +196,7 @@ infrastructure."
     {:keys [analyzer max-results hit->doc fuzzy? skip-duplicates? contexts]}]
    (let [opts {:fuzzy?           (or fuzzy? false)
                :skip-duplicates? (or skip-duplicates? false)
-               :analyzer         (or analyzer *analyzer*)
+               :analyzer         (or analyzer default-analyzer)
                :max-results      (or max-results 10)
                :hit->doc (or hit->doc identity)
                :contexts         contexts}]

@@ -8,7 +8,7 @@
            [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
 
 
-(defn >filter-codec-for-suggestions
+(defn create-filter-codec-for-suggestions
   "Creates a codec for storing fields that support returning suggestions for given prefix strings.
   Chooses the codec based on the field name prefix - which is fixed/pre-decided and not designed to be
   overridden."

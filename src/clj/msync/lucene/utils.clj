@@ -2,7 +2,6 @@
   (:require [clojure.java.io])
   (:import [org.apache.lucene.util BytesRef]
            [java.nio.file Files]
-           [java.io File]
            [java.nio.file.attribute FileAttribute]
            [org.apache.lucene.store FSDirectory]))
 

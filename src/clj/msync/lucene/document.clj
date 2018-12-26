@@ -16,7 +16,7 @@
    :docs-freqs     IndexOptions/DOCS_AND_FREQS
    :docs-freqs-pos IndexOptions/DOCS_AND_FREQS_AND_POSITIONS})
 
-(defn- ^IndexableFieldType create-field-type
+(defn- ^IndexableFieldType field-type
   [{:keys [index-type store? tokenize?]
     :or   {tokenize? true}}]
   (let [opts (index-options index-type IndexOptions/NONE)]
@@ -25,22 +25,22 @@
       (.setStored store?)
       (.setTokenized tokenize?))))
 
-(defn- ^Field create-field
+(defn- ^Field field
   "Document Field"
   [key value opts]
   {:pre [(not (.startsWith (name key) suggest-field-prefix))]}
-  (let [field-type (create-field-type opts)
+  (let [field-type (field-type opts)
         value      (if (keyword? value) (name value) (str value))]
     (Field. ^String (name key) ^String value field-type)))
 
-(defn- ^SuggestField create-suggestible-field
+(defn- ^SuggestField suggest-field
   "Document SuggestField"
   [key contexts value weight]
-  (let [key                 (str suggest-field-prefix (name key))
-        ^SuggestField field (if (empty? contexts)
-                              (SuggestField. key value weight)
-                              (ContextSuggestField. key value weight (into-array String contexts)))]
-    field))
+  (let [key (str suggest-field-prefix (name key))
+        f   (if (empty? contexts)
+              (SuggestField. key value weight)
+              (ContextSuggestField. key value weight (into-array String contexts)))]
+    f))
 
 (defmulti ^:private add-fields!
   (fn [document field-meta field-value field-creator] (sequential? field-value)))
@@ -61,7 +61,7 @@
         indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
         suggest-fields        (or suggest-fields {})
         field-creator         (fn [k v]
-                                (create-field k v
+                                (field k v
                                   {:index-type (get indexed-fields k :none)
                                    :store?     (contains? stored-fields k)
                                    :tokenize?  (not (contains? string-fields k))}))
@@ -69,7 +69,7 @@
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]
-                                  (create-suggestible-field field-name contexts value weight)))
+                                  (suggest-field field-name contexts value weight)))
         doc                   (Document.)]
     (doseq [field-key field-keys]
       (add-fields! doc field-key (get m field-key) field-creator))

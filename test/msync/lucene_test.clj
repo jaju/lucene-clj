@@ -7,7 +7,7 @@
             [msync.lucene.analyzers :as a]))
 
 (def store')
-(defonce analyzer (a/create-default-analyzer))
+(defonce analyzer (a/standard-analyzer))
 (defonce suggestion-context-fields [:real])
 (defn context-fn [doc-map]
   (->> (select-keys doc-map suggestion-context-fields)
@@ -80,15 +80,15 @@
   (deftest parse-query-dsl
     (testing "Given a classic query string"
       (is (= "name:shikari name:shambhu (real:true)^2.0"
-             (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (a/create-default-analyzer)))))))
+             (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (a/standard-analyzer [])))))))
 
   (deftest search-with-query-dsl
     (testing "Search for the Shikari using the classic query DSL"
       (is (= 1 (count
-                 (lucene/search store (query/parse-dsl "shikari" :first-name (a/create-default-analyzer))))))
+                 (lucene/search store (query/parse-dsl "shikari" :first-name (a/standard-analyzer []))))))
 
       (is (= 2 (count
-                 (lucene/search store (query/parse-dsl "gender:f" (a/create-default-analyzer))))))))
+                 (lucene/search store (query/parse-dsl "gender:f" (a/standard-analyzer []))))))))
 
   (deftest paginated-results
       (let [query {:bio #{"love" "enjoy"}}
