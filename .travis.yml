@@ -5,6 +5,5 @@ lein: lein
 script: "lein do clean, test"
 
 jdk:
-  - oraclejdk10
-  - oraclejdk8
+  - openjdk11
   - openjdk8
