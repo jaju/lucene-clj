@@ -49,7 +49,7 @@
     (combine-subexps field-wise-supexps opts BooleanClause$Occur/MUST))
 
   String
-  (parse [str-query {:keys [^Analyzer analyzer field-name query-type fuzzy?]}]
+  (parse [str-query {:keys [^Analyzer analyzer field-name query-type]}]
     (let [builder    (QueryBuilder. analyzer)
           query-type (or query-type (if (re-find #"\s" str-query)
                                       :phrase-query

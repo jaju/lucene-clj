@@ -18,7 +18,7 @@
 
 (defn- ^IndexableFieldType field-type
   [{:keys [index-type store? tokenize?]
-    :or   {tokenize? true}}]
+    :or   {tokenize? true store? false}}]
   (let [opts (index-options index-type IndexOptions/NONE)]
     (doto (FieldType.)
       (.setIndexOptions opts)
@@ -27,11 +27,11 @@
 
 (defn- ^Field field
   "Document Field"
-  [key ^String value opts]
-  {:pre [(not (.startsWith (name key) suggest-field-prefix))]}
-  (let [field-type (field-type opts)
-        value      (if (keyword? value) (name value) (str value))]
-    (Field. (name key) value field-type)))
+  [k ^String v opts]
+  {:pre [(not (.startsWith (name k) suggest-field-prefix))]}
+  (let [ft (field-type opts)
+        v  (if (keyword? v) (name v) (str v))]
+    (Field. (name k) v ft)))
 
 (defn- ^SuggestField suggest-field
   "Document SuggestField"
@@ -71,6 +71,7 @@
     (doseq [[field-key weight] suggest-fields]
       (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
     doc))
+
 
 (defn- field->kv [^Field f]
   [(-> f .name keyword) (.stringValue f)])

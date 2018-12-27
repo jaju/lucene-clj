@@ -15,7 +15,7 @@
        (map string/lower-case)))
 
 (let [data             sample-data
-      store            (lucene/create-store :memory :analyzer analyzer)
+      store            (lucene/store :memory :analyzer analyzer)
       _                (lucene/index! store data
                          {:suggest-fields {:first-name 5}
                           :context-fn     context-fn
