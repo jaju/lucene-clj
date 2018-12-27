@@ -27,49 +27,44 @@
 
 (defn- ^Field field
   "Document Field"
-  [key value opts]
+  [key ^String value opts]
   {:pre [(not (.startsWith (name key) suggest-field-prefix))]}
   (let [field-type (field-type opts)
         value      (if (keyword? value) (name value) (str value))]
-    (Field. ^String (name key) ^String value field-type)))
+    (Field. (name key) value field-type)))
 
 (defn- ^SuggestField suggest-field
   "Document SuggestField"
-  [key contexts value weight]
-  (let [key (str suggest-field-prefix (name key))
-        f   (if (empty? contexts)
-              (SuggestField. key value weight)
-              (ContextSuggestField. key value weight (into-array String contexts)))]
-    f))
+  [key value contexts weight]
+  (let [key (str suggest-field-prefix (name key))]
+    (if (empty? contexts)
+      (SuggestField. key value weight)
+      (ContextSuggestField. key value weight (into-array String contexts)))))
 
-(defmulti ^:private add-fields!
-  (fn [document field-meta field-value field-creator] (sequential? field-value)))
-(defmethod add-fields! false
-  [document field-meta field-value field-creator]
-  (.add document (field-creator field-meta field-value)))
-(defmethod add-fields! true
+(defn- add-fields!
   [document field-meta field-values field-creator]
-  (doseq [field-value field-values]
-    (.add document (field-creator field-meta field-value))))
+  (let [field-values (if (sequential? field-values) field-values [field-values])]
+    (doseq [field-value field-values]
+      (.add document (field-creator field-meta field-value)))))
 
-(defn map->document [m {:keys [string-fields stored-fields indexed-fields suggest-fields context-fn]}]
+(defn map->document [m {:keys [keyword-fields stored-fields indexed-fields suggest-fields context-fn]}]
   "Convert a map to a Lucene document.
   Lossy on the way back. Also, string field names come back as keywords."
   (let [field-keys            (keys m)
-        string-fields         (or string-fields #{})
-        stored-fields         (or stored-fields (into #{} field-keys))
-        indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
+        keyword-fields        (or keyword-fields #{})
+        stored-fields         (or stored-fields #{})
         suggest-fields        (or suggest-fields {})
+        indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
         field-creator         (fn [k v]
                                 (field k v
                                   {:index-type (get indexed-fields k :none)
                                    :store?     (contains? stored-fields k)
-                                   :tokenize?  (not (contains? string-fields k))}))
+                                   :tokenize?  (-> k keyword-fields nil?)}))
         context-fn            (or context-fn (constantly []))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]
-                                  (suggest-field field-name contexts value weight)))
+                                  (suggest-field field-name value contexts weight)))
         doc                   (Document.)]
     (doseq [field-key field-keys]
       (add-fields! doc field-key (get m field-key) field-creator))

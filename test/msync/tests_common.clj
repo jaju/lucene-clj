@@ -29,17 +29,18 @@
      :Genre    keyword-analyzer
      :Subgenre keyword-analyzer}))
 
-(def index (lucene/create-store :memory :analyzer album-data-analyzer))
+(comment
+  (def index (lucene/create-store :memory :analyzer album-data-analyzer))
 
-(lucene/index! index album-data {:analyzer       album-data-analyzer
-                                 :context-fn     (fn [d] [(:Genre d)])
-                                 :suggest-fields {:Album 1 :Artist 1}})
-(lucene/delete-all! index)
+  (lucene/index! index album-data {:analyzer       album-data-analyzer
+                                   :context-fn     (fn [d] [(:Genre d)])
+                                   :suggest-fields {:Album 1 :Artist 1}})
+  (lucene/delete-all! index)
 
-(lucene/search index {:Year "1967"} {:results-per-page 5
-                                     :hit->doc         #(-> %
-                                                          ld/document->map
-                                                          (select-keys [:Year :Album :Artist :Subgenre]))})
+  (lucene/search index {:Year "1967"} {:results-per-page 5
+                                       :hit->doc         #(-> %
+                                                            ld/document->map
+                                                            (select-keys [:Year :Album :Artist :Subgenre]))})
 
-(lucene/suggest index :Album "fore" {:hit->doc ld/document->map :fuzzy? true})
-(lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true})
+  (lucene/suggest index :Album "fore" {:hit->doc ld/document->map :fuzzy? true})
+  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true}))

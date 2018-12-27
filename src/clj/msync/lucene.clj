@@ -112,7 +112,7 @@
 
 (defmethod index! IndexWriter
   [^IndexWriter index-writer doc-maps
-   {:keys [stored-fields indexed-fields suggest-fields string-fields context-fn]
+   {:keys [stored-fields indexed-fields suggest-fields keyword-fields context-fn]
     :as   doc-opts}]
   (let [doc-maps (if (map? doc-maps) [doc-maps] doc-maps)
         doc-fn   (fn [doc-map] (d/map->document doc-map doc-opts))]

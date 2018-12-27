@@ -19,7 +19,7 @@
       _                (lucene/index! store data
                          {:suggest-fields {:first-name 5}
                           :context-fn     context-fn
-                          :string-fields  #{:age}})
+                          :keyword-fields #{:age}})
       directory        (:directory store)]
 
   ;; This is to hold onto the index when created during REPL-driven development, and this buffer is eval'ed.
@@ -111,3 +111,6 @@
       (testing "Asking for suggestions from a large (ahem!) repository, one page at a time"
         (is (= 2 (count result-1)))
         (is (= 4 (count result-2)))))))
+
+(comment
+  (run-all-tests (-> *ns* str re-pattern)))
