@@ -16,7 +16,8 @@
   :java-source-paths ["src/java"]
   :javac-options ["-target" "8" "-source" "8" "-deprecation" "-Xlint:-options"]
 
-  :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]]
+  :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]
+                                   [criterium "0.4.4"]]
                     :source-paths ["dev"]
                     :resource-paths ["test-resources"]}
 
