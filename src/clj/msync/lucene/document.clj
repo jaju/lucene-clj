@@ -72,6 +72,29 @@
       (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
     doc))
 
+(defn fn:map->document [{:keys [fields keyword-fields stored-fields indexed-fields suggest-fields context-fn]}]
+  "Convert a map to a Lucene document.
+  Lossy on the way back. Also, string field names come back as keywords."
+  (let [keyword-fields        (or keyword-fields #{})
+        stored-fields         (or stored-fields #{})
+        suggest-fields        (or suggest-fields {})
+        indexed-fields        (or indexed-fields (zipmap fields (repeat :full)))
+        field-creator         (fn [k v]
+                                (field k v
+                                  {:index-type (get indexed-fields k :none)
+                                   :store?     (contains? stored-fields k)
+                                   :tokenize?  (-> k keyword-fields nil?)}))
+        context-fn            (or context-fn (constantly []))
+        suggest-field-creator (fn [m [field-name weight] v]
+                                (let [value v]
+                                  (suggest-field field-name value (context-fn m) weight)))]
+    (fn [m]
+      (let [doc (Document.)]
+        (doseq [f fields]
+          (add-fields! doc f (get m f) field-creator))
+        (doseq [[f weight] suggest-fields]
+          (add-fields! doc [f weight] (get m f) (partial suggest-field-creator m)))
+        doc))))
 
 (defn- field->kv [^Field f]
   [(-> f .name keyword) (.stringValue f)])

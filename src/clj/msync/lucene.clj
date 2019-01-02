@@ -6,88 +6,20 @@
              [query :as query]
              [suggestions :as su]
              [utils :as utils]
+             [store :as store]
              [analyzers :as a]])
-  (:import [org.apache.lucene.store Directory FSDirectory MMapDirectory]
-           [org.apache.lucene.analysis Analyzer]
+  (:import [org.apache.lucene.store Directory]
            [java.util Set]
-           [java.io File]
-           [org.apache.lucene.index IndexWriterConfig IndexWriter IndexReader DirectoryReader Term]
+           [org.apache.lucene.index IndexWriter IndexReader Term]
            [java.util.logging Logger]
            [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc FuzzyQuery BooleanQuery$Builder BooleanClause$Occur]
            [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
-           [org.apache.lucene.search.suggest InputIterator Lookup]))
+           [org.apache.lucene.search.suggest InputIterator Lookup]
+           [msync.lucene.store Store]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defonce logger (Logger/getLogger "msync.lucene"))
-(defrecord ^:private Store [directory analyzer])
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (defonce default-analyzer (a/standard-analyzer))
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(defn- index-writer-config
-  "IndexWriterConfig instance."
-
-  ([] (index-writer-config default-analyzer))
-
-  ([^Analyzer analyzer]
-   (doto (IndexWriterConfig. analyzer)
-     (.setCodec (su/create-filter-codec-for-suggestions)))))
-
-(defn- ^IndexWriter index-writer
-  "IndexWriter instance."
-  ([^Directory directory]
-   (index-writer directory (index-writer-config)))
-  ([^Directory directory
-    ^IndexWriterConfig index-writer-config]
-   (IndexWriter. directory index-writer-config)))
-
-(defn- ^IndexReader index-reader
-  "An IndexReader instance."
-  [^Directory directory]
-  (DirectoryReader/open directory))
-
-(defmulti delete-all! class)
-
-(defmethod delete-all! Store
-  [^Store store]
-  (with-open [iw (-> store :directory index-writer)]
-    (delete-all! iw)))
-
-(defmethod delete-all! IndexWriter
-  [^IndexWriter iw]
-  (.deleteAll iw))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn- new-store [directory analyzer]
-  (->Store directory analyzer))
-
-(defn- ^Directory memory-index
-  "Lucene Directory for transient indexes"
-  []
-  (let [temp-path (utils/temp-path)
-        d         (MMapDirectory. temp-path)]
-    (utils/delete-on-exit! d)
-    d))
-
-(defn- ^Directory disk-index
-  "Persistent index on disk"
-  [^String dir-path {:keys [re-create?] :or {re-create? false}}]
-  (let [path (.toPath ^File (io/as-file dir-path))
-        dir  (FSDirectory/open path)]
-    (when re-create?
-      (delete-all! dir))
-    dir))
-
-(defn ^Store store
-  "Create an appropriate index - where path is either the keyword :memory, or
-  a string representing the path on disk where the index is created."
-  [path & {:keys [analyzer]
-           :as   opts}]
-  (let [index (if (= path :memory)
-                (memory-index)
-                (disk-index path opts))]
-    (new-store index analyzer)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti index! (fn [o & _] (class o)))
@@ -95,15 +27,16 @@
 (defmethod index! Store
   [^Store store doc-maps opts]
   (let [{:keys [analyzer directory]} store
-        iw-config (index-writer-config analyzer)]
-    (with-open [iw (index-writer directory iw-config)]
+        iw-config (store/index-writer-config analyzer)]
+    (with-open [iw (store/index-writer directory iw-config)]
       (index! iw doc-maps (dissoc opts :analyzer)))))
 
 (defmethod index! IndexWriter
   [^IndexWriter iw doc-maps
-   {:keys [stored-fields indexed-fields suggest-fields keyword-fields context-fn]
+   {:keys [fields stored-fields indexed-fields suggest-fields keyword-fields context-fn]
     :as   doc-opts}]
   (let [doc-maps (if (map? doc-maps) [doc-maps] doc-maps)
+        ;doc-fn   (d/fn:map->document doc-opts)
         doc-fn   (fn [doc-map] (d/map->document doc-map doc-opts))]
     (doseq [document (map doc-fn doc-maps)]
       (.addDocument iw document))))
@@ -122,7 +55,7 @@
 
 (defmethod search* Directory
   [^Directory index-store query-form opts]
-  (with-open [reader (index-reader index-store)]
+  (with-open [reader (store/index-reader index-store)]
     (search* reader query-form opts)))
 
 (defmethod search* IndexReader
@@ -171,7 +104,7 @@ infrastructure."
 
   ([store field-name prefix-query opts]
    (let [{:keys [directory analyzer]} store]
-     (with-open [index-reader (index-reader directory)]
+     (with-open [index-reader (store/index-reader directory)]
        (suggest index-reader field-name prefix-query (assoc opts :analyzer analyzer))))))
 
 (defmethod suggest IndexReader
@@ -193,7 +126,7 @@ infrastructure."
 
 (defn create-infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
                                                                              :or         {suggester-class :infix}}]
-  (let [index     (store path :re-create? true)
+  (let [index     (store/store path :re-create? true)
         suggester (case suggester-class
                     :infix (AnalyzingInfixSuggester. index analyzer)
                     :blended-infix (BlendedInfixSuggester. index analyzer))]

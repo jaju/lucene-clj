@@ -2,25 +2,44 @@
   (:require [clojure.test :refer :all]
             [msync.tests-common :refer :all]
             [msync.lucene :as lucene]
+            [msync.lucene.store :as store]
             [clojure.string :as string]
             [msync.lucene.query :as query]
-            [msync.lucene.analyzers :as a]))
+            [msync.lucene.analyzers :as a]
+            [criterium.core :refer [bench]]))
 
 (def store')
 (defonce analyzer (a/standard-analyzer))
 (defonce suggestion-context-fields [:real])
 (defn context-fn [doc-map]
   (->> (select-keys doc-map suggestion-context-fields)
-       vals
-       (map string/lower-case)))
+    vals
+    (map string/lower-case)))
 
-(let [data             sample-data
-      store            (lucene/store :memory :analyzer analyzer)
-      _                (lucene/index! store data
-                         {:suggest-fields {:first-name 5}
-                          :context-fn     context-fn
-                          :keyword-fields #{:age}})
-      directory        (:directory store)]
+(comment (let [data           sample-data
+               fields         #{:first-name :last-name :age :real :gender :bio}
+               suggest-fields {:first-name 1}
+               keyword-fields #{:age}
+               store          (lucene/store :memory :analyzer analyzer)
+               _              (lucene/index! store data
+                                {:fields         fields
+                                 :suggest-fields suggest-fields
+                                 :context-fn     context-fn
+                                 :stored-fields  fields
+                                 :keyword-fields keyword-fields})]))
+
+(let [data           sample-data
+      fields         #{:first-name :last-name :age :real :gender :bio}
+      suggest-fields {:first-name 1}
+      keyword-fields #{:age}
+      store          (store/store :memory :analyzer analyzer)
+      _              (lucene/index! store data
+                       {:fields         fields
+                        :suggest-fields suggest-fields
+                        :context-fn     context-fn
+                        :stored-fields  fields
+                        :keyword-fields keyword-fields})
+      directory      (:directory store)]
 
   ;; This is to hold onto the index when created during REPL-driven development, and this buffer is eval'ed.
   (alter-var-root #'store' (constantly store))
@@ -80,7 +99,7 @@
   (deftest parse-query-dsl
     (testing "Given a classic query string"
       (is (= "name:shikari name:shambhu (real:true)^2.0"
-             (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (a/standard-analyzer [])))))))
+            (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (a/standard-analyzer [])))))))
 
   (deftest search-with-query-dsl
     (testing "Search for the Shikari using the classic query DSL"
@@ -91,18 +110,18 @@
                  (lucene/search store (query/parse-dsl "gender:f" (a/standard-analyzer []))))))))
 
   (deftest paginated-results
-      (let [query {:bio #{"love" "enjoy"}}
-            max-results 10
-            page-0 (lucene/search store query {:max-results max-results :page 0 :results-per-page 2})
-            page-1 (lucene/search store query {:max-results max-results :page 1 :results-per-page 2})
-            page-2 (lucene/search store query {:max-results max-results :page 2 :results-per-page 2})]
-        (testing "Fetching from a large (ahem!) repository, one page at a time"
-          (is (= 2 (count page-0)))
-          (is (= 2 (count page-1)))
-          (is (= 2 (count page-2))))
+    (let [query       {:bio #{"love" "enjoy"}}
+          max-results 10
+          page-0      (lucene/search store query {:max-results max-results :page 0 :results-per-page 2})
+          page-1      (lucene/search store query {:max-results max-results :page 1 :results-per-page 2})
+          page-2      (lucene/search store query {:max-results max-results :page 2 :results-per-page 2})]
+      (testing "Fetching from a large (ahem!) repository, one page at a time"
+        (is (= 2 (count page-0)))
+        (is (= 2 (count page-1)))
+        (is (= 2 (count page-2))))
 
-        (testing "All pages have non-overlapping documents"
-          (is (= 6 (count (into #{} (map :doc-id (flatten [page-0 page-1 page-2])))))))))
+      (testing "All pages have non-overlapping documents"
+        (is (= 6 (count (into #{} (map :doc-id (flatten [page-0 page-1 page-2])))))))))
 
   (deftest suggestions-with-limit-params
     (let [query    "S"

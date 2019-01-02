@@ -6,6 +6,8 @@
            [java.util Collection]
            [org.apache.lucene.analysis.standard StandardAnalyzer]))
 
+(defn ^Analyzer keyword-analyzer [] (KeywordAnalyzer.))
+
 (defn ^Analyzer standard-analyzer
   "StandardAnalyzer, with configurable stop-words and case-ignore behavior."
   ([] (standard-analyzer [] true))
@@ -17,5 +19,3 @@
   "Per-field analyzer. Takes a default analyzer, and a map from field-name -> analyzer"
   [^Analyzer default-analyzer field->analyzer]
   (PerFieldAnalyzerWrapper. default-analyzer (stringify-keys field->analyzer)))
-
-(defn ^Analyzer keyword-analyzer [] (KeywordAnalyzer.))
