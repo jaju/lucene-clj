@@ -5,14 +5,14 @@
              [document :as d]
              [query :as query]
              [suggestions :as su]
-             [utils :as utils]
              [store :as store]
              [analyzers :as a]])
-  (:import [org.apache.lucene.store Directory]
-           [java.util Set]
-           [org.apache.lucene.index IndexWriter IndexReader Term]
+  (:import [java.util Set]
            [java.util.logging Logger]
-           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc FuzzyQuery BooleanQuery$Builder BooleanClause$Occur]
+           [org.apache.lucene.store Directory]
+           [org.apache.lucene.index IndexWriter IndexReader Term]
+           [org.apache.lucene.search IndexSearcher Query TopDocs ScoreDoc FuzzyQuery
+                                     BooleanQuery$Builder BooleanClause$Occur]
            [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
            [org.apache.lucene.search.suggest InputIterator Lookup]
            [msync.lucene.store Store]))
@@ -73,10 +73,10 @@
                                   (query/parse query-form {:analyzer analyzer :field-name field-name}))
         ^TopDocs hits           (.search searcher query (int max-results))
         start                   (* page results-per-page)
-        end                     (min (+ start results-per-page) max-results (.totalHits hits))]
+        end                     (min (+ start results-per-page) max-results (.value (.totalHits hits)))]
     (vec
       (for [^ScoreDoc hit (map (partial aget (.scoreDocs hits))
-                            (range start end))]
+                               (range start end))]
         (let [doc-id (.doc hit)
               doc    (.doc searcher doc-id)
               score  (.score hit)]
@@ -92,10 +92,10 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti suggest
-  "Return suggestions for prefix-queries. The index should have been created with
-appropriate configuration for which fields should be analyzed for creating the suggestions
-infrastructure."
-  #(class (first %&)))
+          "Return suggestions for prefix-queries. The index should have been created with
+        appropriate configuration for which fields should be analyzed for creating the suggestions
+        infrastructure."
+          #(class (first %&)))
 
 (defmethod suggest Store
 
@@ -118,14 +118,14 @@ infrastructure."
                :skip-duplicates? (or skip-duplicates? false)
                :analyzer         (or analyzer default-analyzer)
                :max-results      (or max-results 10)
-               :hit->doc (or hit->doc identity)
+               :hit->doc         (or hit->doc identity)
                :contexts         contexts}]
      (su/suggest index-reader (name field-name) prefix-query opts))))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 (defn create-infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
-                                                                             :or         {suggester-class :infix}}]
+                                                                             :or   {suggester-class :infix}}]
   (let [index     (store/store path :re-create? true)
         suggester (case suggester-class
                     :infix (AnalyzingInfixSuggester. index analyzer)

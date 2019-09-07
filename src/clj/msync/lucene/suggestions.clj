@@ -5,7 +5,7 @@
             TopSuggestDocs SuggestIndexSearcher ContextQuery
             PrefixCompletionQuery FuzzyCompletionQuery Completion50PostingsFormat CompletionQuery]
            [org.apache.lucene.index Term IndexReader]
-           [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
+           [org.apache.lucene.codecs.lucene80 Lucene80Codec]))
 
 
 (defn create-filter-codec-for-suggestions
@@ -14,7 +14,7 @@
   overridden."
   []
   (let [comp-postings-format (Completion50PostingsFormat.)]
-    (proxy [Lucene70Codec] []
+    (proxy [Lucene80Codec] []
       (getPostingsFormatForField [field-name]
         (if (.startsWith field-name d/suggest-field-prefix)
           comp-postings-format

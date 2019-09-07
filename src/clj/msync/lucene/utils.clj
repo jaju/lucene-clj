@@ -21,22 +21,21 @@
   (reset! deletable-directory-list #{}))
 
 (.addShutdownHook (Runtime/getRuntime)
-  (proxy [Thread] []
-    (run [] (delete-marked-lucene-directories!))))
+                  (proxy [Thread] []
+                    (run [] (delete-marked-lucene-directories!))))
 
 (defn temp-path [& {:keys [prefix]
-                    :or {prefix "msync-lucene"}}]
+                    :or   {prefix "msync-lucene"}}]
   (let [path (Files/createTempDirectory prefix (make-array FileAttribute 0))]
     path))
 
-(defn docfields-vecs-to-maps
-  "Seq of documents, each a vector.
-  Each element in a vector corresponds to a field.
-  The first element in the seq is the `header`.
-  Output is a map of each document, with each field keyed with its name.
-  Use-case: A CSV, with a header-row, parsed and fed."
+(defn docs:vecs->maps
+  "Collection of vectors, with the first considered the header.
+  [[field1 field2] [f11 f12] [f21 f22]] =>
+  [{:field1 f11 :field2 f22} {:field1 f21 :field2 f22}]
+  Returns a collection of maps, where the key is the corresponding header field."
   ([doc-vecs-with-header]
-   (docfields-vecs-to-maps (first doc-vecs-with-header) (rest doc-vecs-with-header)))
+   (apply docs:vecs->maps ((juxt first rest) doc-vecs-with-header)))
   ([header-vec doc-vecs]
    (map zipmap (->> header-vec
                     (map keyword)

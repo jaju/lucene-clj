@@ -1,11 +1,11 @@
-(def lucene-version "7.6.0")
+(def lucene-version "8.2.0")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
   :url "https://github.com/jaju/lucene-clj"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.10.0"]
+  :dependencies [[org.clojure/clojure "1.10.1"]
                  [org.apache.lucene/lucene-core ~lucene-version]
                  [org.apache.lucene/lucene-queryparser ~lucene-version]
                  [org.apache.lucene/lucene-analyzers-common ~lucene-version]
@@ -17,7 +17,7 @@
   :javac-options ["-target" "8" "-source" "8" "-deprecation" "-Xlint:-options"]
 
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]
-                                   [criterium "0.4.4"]]
+                                   [criterium "0.4.5"]]
                     :source-paths ["dev"]
                     :resource-paths ["test-resources"]}
 

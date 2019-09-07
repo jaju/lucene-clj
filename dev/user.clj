@@ -3,7 +3,7 @@
             #_[msync.lucene :as lucene])
   (:import [org.apache.lucene.index Term]
            [org.apache.lucene.search.suggest.document PrefixCompletionQuery SuggestIndexSearcher Completion50PostingsFormat]
-           [org.apache.lucene.codecs.lucene70 Lucene70Codec]))
+           [org.apache.lucene.codecs.lucene80 Lucene80Codec]))
 
 (defonce test-doc-maps
          (let [csv-string (slurp "test-resources/sample-data.csv")
@@ -16,7 +16,7 @@
 
 (defn >filter-codec []
   (proxy
-    [Lucene70Codec] []
+    [Lucene80Codec] []
 
     (getPostingsFormatForField [field-name]
       (if (.startsWith field-name "$suggest-")

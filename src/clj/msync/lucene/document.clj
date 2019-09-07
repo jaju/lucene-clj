@@ -26,7 +26,8 @@
       (.setTokenized tokenize?))))
 
 (defn- ^Field field
-  "Document Field"
+  "Document Field.
+  TBD: Support values other than as strings. Currently, everything is converted to a string."
   [k ^String v opts]
   {:pre [(not (.startsWith (name k) suggest-field-prefix))]}
   (let [ft (field-type opts)

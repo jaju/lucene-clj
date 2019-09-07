@@ -10,7 +10,7 @@
                     weight-fn]}]
   (let [coll      (into [] coll)
         payload?  (not-nil? payload-fn)
-        contexts?  (not-nil? context-fn)
+        contexts? (not-nil? context-fn)
         weight-fn (or weight-fn (constantly 1))]
     (atom {:v-coll     coll
            :index      0

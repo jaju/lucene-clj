@@ -9,16 +9,16 @@
             [clojure.java.io :as io]))
 
 (defonce sample-data (-> "sample-data.csv"
-                       io/resource
-                       slurp
-                       csv/read-csv
-                       utils/docfields-vecs-to-maps))
+                         io/resource
+                         slurp
+                         csv/read-csv
+                         utils/docs:vecs->maps))
 
 (defonce album-data (-> "albumlist.csv"
-                      io/resource
-                      slurp
-                      csv/read-csv
-                      utils/docfields-vecs-to-maps))
+                        io/resource
+                        slurp
+                        csv/read-csv
+                        utils/docs:vecs->maps))
 
 (defonce default-analyzer (analyzers/standard-analyzer))
 (defonce keyword-analyzer (analyzers/keyword-analyzer))
