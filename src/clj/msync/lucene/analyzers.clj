@@ -2,11 +2,13 @@
   (:require [clojure.walk :refer [stringify-keys]])
   (:import [org.apache.lucene.analysis.miscellaneous PerFieldAnalyzerWrapper]
            [org.apache.lucene.analysis Analyzer CharArraySet]
-           [org.apache.lucene.analysis.core KeywordAnalyzer]
+           [org.apache.lucene.analysis.core KeywordAnalyzer SimpleAnalyzer]
            [java.util Collection]
            [org.apache.lucene.analysis.standard StandardAnalyzer]))
 
 (defn ^Analyzer keyword-analyzer [] (KeywordAnalyzer.))
+
+(defn ^Analyzer simple-analyzer [] (SimpleAnalyzer.))
 
 (defn ^Analyzer standard-analyzer
   "StandardAnalyzer, with configurable stop-words and case-ignore behavior."
