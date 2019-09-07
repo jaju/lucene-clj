@@ -5,7 +5,7 @@ The primary use-case is for in-process text search needs for *read-only* dataset
 
 Both in-memory, and on-disk indexes can be used depending on the dataset size.
 
-Note: **UNSTABLE** API. No releases yet, but coming soon.
+Note: *UNSTABLE* API. No releases yet, but coming soon.
 
 ** Dependency
 #+BEGIN_SRC clojure
