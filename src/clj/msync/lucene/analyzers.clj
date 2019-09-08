@@ -6,14 +6,14 @@
            [java.util Collection]
            [org.apache.lucene.analysis.standard StandardAnalyzer]))
 
-(defn ^Analyzer keyword-analyzer [] (KeywordAnalyzer.))
-
 (defn ^Analyzer simple-analyzer [] (SimpleAnalyzer.))
+
+(defn ^Analyzer keyword-analyzer [] (KeywordAnalyzer.))
 
 (defn ^Analyzer standard-analyzer
   "StandardAnalyzer, with configurable stop-words and case-ignore behavior."
   ([] (standard-analyzer [] true))
-  ([stop-words] (standard-analyzer stop-words true))
+  ([^Collection stop-words] (standard-analyzer stop-words true))
   ([^Collection stop-words ignore-case?]
    (StandardAnalyzer. (CharArraySet. stop-words ignore-case?))))
 

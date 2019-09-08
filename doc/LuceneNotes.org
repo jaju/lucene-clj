@@ -1,0 +1,28 @@
+* About this document
+This document is a minimalistic attempt to list down important underlying Lucene classes to be aware of, while developing this library.
+
+Disclaimer: You may find some opinions/judgments here. The naming of classes, to an outsider not privy to the evolutionary history of the Lucene codebase, is frustratingly hard to make sense of. Lucene is extremely malleable with a huge number of knobs provided to control every minute behavior, but there is no easily visible method to the madness.
+
+* Document
+The /org.apache.lucene.document.Document/ class represents a single unit of indexable entity. It is made up of a set of /fields/, represented by the /org.apache.lucene.document.Field/ class.
+
+** Field
+The /Field/ is a key element in the landscape, and controls closely how content is stored and searched. The current focus of the library is to assist in easy free-text indexing and search and we do not focus much on the varieties of /Field/ types available. But it's important to know of, for one specific use-case which is of importance to us - /suggestions/. This library started primarily because the other wrappers of Lucene did not support prefix-based search suggestions, which was a key requirement in the application I was working on.
+
+* Analyzers
+
+The base class /org.apache.lucene.analysis.Analyzer/ represents entities that analyze text content and generate token-streams. Specialized implementations take into account various attributes of the text source, but the most specialized ones are based on the /natural language/ of the input as they build on /StopwordAnalyzerBase/ and stop-words differ very specifically from language to language.
+
+While analyzers can (and should) be created by hand for each type of input, we provide convenience access to
+- *SimpleAnalyzer* - Divides text at /non-letters/ - as identified by /java.lang.Character.isLetter()/, and lower-cases them again using the java.lang.Character class' built-in.
+- *KeywordAnalyzer* - Takes the entire input as-is. Proper nouns, labels etc. are candidates for this.
+- *StandardAnalyzer* - Uses standard word-segmentation rules, and allows for a custom stopword list
+- *PerFieldAnalyzerWrapper* - Allows for composing different analyzers, via field-name based delegation.
+The above are language-agnostic and can cover most common cases without having to dig into the more specialized implementations.
+
+* Indexers and Searchers
+** IndexWriter
+The /IndexWriter/ class is the (currently) only way to write to an index. Which is a relief in the vast tree of hierarchies of classes in Lucene.
+
+** IndexSearcher, SuggestIndexSearcher
+These help in searching in indexes, via various kinds of /Query/ objects. The /SuggestIndexSearcher/ deals with /*CompletionQuery/ classes.

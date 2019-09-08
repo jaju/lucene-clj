@@ -17,6 +17,7 @@
    :docs-freqs-pos IndexOptions/DOCS_AND_FREQS_AND_POSITIONS})
 
 (defn- ^IndexableFieldType field-type
+  "Each field's information is carried in its corresponding IndexableFieldType attribute. Internal detail."
   [{:keys [index-type store? tokenize?]
     :or   {tokenize? true store? false}}]
   (let [opts (index-options index-type IndexOptions/NONE)]
@@ -25,14 +26,18 @@
       (.setStored store?)
       (.setTokenized tokenize?))))
 
+(defn- reserved-name? [field-name]
+  (not (.startsWith (name field-name) suggest-field-prefix)))
+
+(defn- stringify-value [v]
+  (if (keyword? v) (name v) (str v)))
+
 (defn- ^Field field
   "Document Field.
   TBD: Support values other than as strings. Currently, everything is converted to a string."
   [k ^String v opts]
-  {:pre [(not (.startsWith (name k) suggest-field-prefix))]}
-  (let [ft (field-type opts)
-        v  (if (keyword? v) (name v) (str v))]
-    (Field. (name k) v ft)))
+  {:pre [(reserved-name? k)]}
+  (Field. (name k) (stringify-value v) (field-type opts)))
 
 (defn- ^SuggestField suggest-field
   "Document SuggestField"
@@ -58,9 +63,9 @@
         indexed-fields        (or indexed-fields (zipmap (keys m) (repeat :full)))
         field-creator         (fn [k v]
                                 (field k v
-                                  {:index-type (get indexed-fields k :none)
-                                   :store?     (contains? stored-fields k)
-                                   :tokenize?  (-> k keyword-fields nil?)}))
+                                       {:index-type (get indexed-fields k :none)
+                                        :store?     (contains? stored-fields k)
+                                        :tokenize?  (-> k keyword-fields nil?)}))
         context-fn            (or context-fn (constantly []))
         contexts              (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
@@ -82,9 +87,9 @@
         indexed-fields        (or indexed-fields (zipmap fields (repeat :full)))
         field-creator         (fn [k v]
                                 (field k v
-                                  {:index-type (get indexed-fields k :none)
-                                   :store?     (contains? stored-fields k)
-                                   :tokenize?  (-> k keyword-fields nil?)}))
+                                       {:index-type (get indexed-fields k :none)
+                                        :store?     (contains? stored-fields k)
+                                        :tokenize?  (-> k keyword-fields nil?)}))
         context-fn            (or context-fn (constantly []))
         suggest-field-creator (fn [m [field-name weight] v]
                                 (let [value v]

@@ -21,17 +21,15 @@
 (defn index-writer-config
   "IndexWriterConfig instance."
 
-  ([^Analyzer analyzer]
-   (doto (IndexWriterConfig. analyzer)
-     (.setCodec (su/create-filter-codec-for-suggestions)))))
+  [^Analyzer analyzer]
+  (doto (IndexWriterConfig. analyzer)
+    (.setCodec (su/create-filter-codec-for-suggestions))))
 
 (defn ^IndexWriter index-writer
   "IndexWriter instance."
-  ([^Directory directory]
-   (index-writer directory (index-writer-config)))
-  ([^Directory directory
-    ^IndexWriterConfig index-writer-config]
-   (IndexWriter. directory index-writer-config)))
+  [^Directory directory
+   ^IndexWriterConfig index-writer-config]
+  (IndexWriter. directory index-writer-config))
 
 (defn ^IndexReader index-reader
   "An IndexReader instance."
@@ -42,7 +40,7 @@
 
 (defmethod delete-all! Store
   [^Store store]
-  (with-open [iw (-> store :directory index-writer)]
+  (with-open [iw (index-writer (:directory store) (index-writer-config (:analyzer store)))]
     (delete-all! iw)))
 
 (defmethod delete-all! IndexWriter
@@ -52,7 +50,7 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn- new-store [directory analyzer
                   & {:keys []
-                     :as opts}]
+                     :as   opts}]
   (->Store directory analyzer (atom (or opts {}))))
 
 (defn- ^Directory memory-index

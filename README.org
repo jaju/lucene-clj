@@ -96,7 +96,7 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 **** Phrase search
 #+BEGIN_SRC clojure
   ;; Space(s) in the query string are inferred to mean a phrase search operation
-  (lucene/search idx {:description "read more"})
+  (lucene/search store {:description "read more"})
 #+END_SRC
 
 **** Suggestion
@@ -107,7 +107,10 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 
 ** Sample Datasets
 1. [[https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone][Albums - Kaggle]] - [[[file:test-resources/albumlist.csv][local]]]
-2. Hand-created, real + fictional characters ([[file:test-resources/sample-data.csv][here]])
+2. Hand-created, real + fictional characters [[file:test-resources/sample-data.csv][here]]
+
+** Additional notes
+- Some minimal technical overview of Lucene internals for this project can be found [[file:doc/LuceneNotes.org][here]].
 
 ** License
 Copyright © 2018-19 Ravindra R. Jaju

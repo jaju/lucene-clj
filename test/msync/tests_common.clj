@@ -2,7 +2,8 @@
   (:require [msync.lucene :as lucene]
             [msync.lucene
              [analyzers :as analyzers]
-             [document :as ld]]
+             [document :as ld]
+             [store :as store]]
             [clojure.test :refer :all]
             [msync.lucene.utils :as utils]
             [clojure.data.csv :as csv]
@@ -24,23 +25,25 @@
 (defonce keyword-analyzer (analyzers/keyword-analyzer))
 
 (defonce album-data-analyzer
-  (analyzers/per-field-analyzer default-analyzer
-    {:Year     keyword-analyzer
-     :Genre    keyword-analyzer
-     :Subgenre keyword-analyzer}))
+         (analyzers/per-field-analyzer default-analyzer
+                                       {:Year     keyword-analyzer
+                                        :Genre    keyword-analyzer
+                                        :Subgenre keyword-analyzer}))
 
 (comment
-  (def index (lucene/store :memory :analyzer album-data-analyzer))
+  (def index (store/store :memory :analyzer album-data-analyzer))
 
   (lucene/index! index album-data {:analyzer       album-data-analyzer
                                    :context-fn     (fn [d] [(:Genre d)])
-                                   :suggest-fields {:Album 1 :Artist 1}})
-  (lucene/delete-all! index)
+                                   :suggest-fields {:Album 1 :Artist 1}
+                                   :stored-fields  #{:Number :Year :Album :Artist :Genre :Subgenre}
+                                   })
+  (store/delete-all! index)
 
   (lucene/search index {:Year "1967"} {:results-per-page 5
                                        :hit->doc         #(-> %
-                                                            ld/document->map
-                                                            (select-keys [:Year :Album :Artist :Subgenre]))})
+                                                              ld/document->map
+                                                              (select-keys [:Year :Album :Artist :Subgenre]))})
 
-  (lucene/suggest index :Album "fore" {:hit->doc ld/document->map :fuzzy? true})
-  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true}))
+  (lucene/suggest index :Album "ple" {:hit->doc ld/document->map :fuzzy? false})
+  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? false}))
