@@ -1,43 +1,36 @@
 (ns user
   (:require [clojure.data.csv :as csv]
-            #_[msync.lucene :as lucene])
+            [clojure.java.io :as io]
+            [msync.lucene :as lucene]
+            [msync.lucene
+             [analyzers :refer [standard-analyzer]]
+             [store :as store]
+             [utils :as utils]
+             [document :as ld]
+             [tests-common :refer :all]])
   (:import [org.apache.lucene.index Term]
            [org.apache.lucene.search.suggest.document PrefixCompletionQuery SuggestIndexSearcher Completion50PostingsFormat]
            [org.apache.lucene.codecs.lucene80 Lucene80Codec]))
 
-(defonce test-doc-maps
-         (let [csv-string (slurp "test-resources/sample-data.csv")
-               csv-stream (csv/read-csv csv-string)]
-           (map zipmap
-                (->> (first csv-stream)
-                     (map keyword)
-                     repeat)
-                (rest csv-stream))))
-
-(defn >filter-codec []
-  (proxy
-    [Lucene80Codec] []
-
-    (getPostingsFormatForField [field-name]
-      (if (.startsWith field-name "$suggest-")
-        (Completion50PostingsFormat.)
-        (proxy-super getPostingsFormatForField field-name)))))
-
-#_(defn comp-iw-config> []
-    (let [c (#'lucene/>index-writer-config)]
-      (.setCodec c (>filter-codec))
-      c))
 
 (comment
-  (def mem-dir (lucene/>memory-index))
-  (def comp-iw-config (comp-iw-config>))
-  (def writer (#'lucene/>index-writer mem-dir comp-iw-config))
-  (lucene/index-all! writer test-doc-maps {:suggest-fields {:first-name 5}})
-  (.commit writer)
-  (def reader (#'lucene/>index-reader mem-dir))
-  (def term (Term. "suggest-first-name" "S"))
-  (def analyzer (lucene/>standard-analyzer))
-  (def pcq (PrefixCompletionQuery. analyzer term))
-  (def suggester (SuggestIndexSearcher. reader))
-  (.suggest suggester pcq 5 false)
-  (lucene/search mem-dir "suppandi" {:field-name "first-name"}))
+
+  album-data-analyzer
+  sample-data
+  album-data
+
+  (def index (store/store :memory :analyzer album-data-analyzer))
+
+  (lucene/index! index album-data
+                 {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
+                  :suggest-fields [:Album :Artist]
+                  :stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]})
+
+  (lucene/search index {:Year "1967"}
+                 {:results-per-page 5
+                  :hit->doc         #(-> %
+                                         ld/document->map
+                                         (select-keys [:Year :Album]))})
+
+  (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})
+  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true}))

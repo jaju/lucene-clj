@@ -18,7 +18,7 @@
 
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "0.1.4"]
                                    [criterium "0.4.5"]]
-                    :source-paths ["dev"]
+                    :source-paths ["test" "dev"]
                     :resource-paths ["test-resources"]}
 
              :test {:dependencies   [[org.clojure/data.csv "0.1.4"]]

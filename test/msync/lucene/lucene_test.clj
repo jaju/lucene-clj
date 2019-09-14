@@ -1,6 +1,6 @@
-(ns msync.lucene-test
+(ns msync.lucene.lucene-test
   (:require [clojure.test :refer :all]
-            [msync.tests-common :refer :all]
+            [msync.lucene.tests-common :refer :all]
             [msync.lucene :as lucene]
             [msync.lucene.store :as store]
             [clojure.string :as string]

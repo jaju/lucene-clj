@@ -26,18 +26,18 @@
 
 (defmethod index! Store
   [^Store store doc-maps opts]
-  (let [{:keys [analyzer directory]} store
-        iw-config (store/index-writer-config analyzer)]
-    (with-open [iw (store/index-writer directory iw-config)]
+  (let [analyzer  (:analyzer store)
+        directory (:directory store)
+        iwc       (store/index-writer-config analyzer)]
+    (with-open [iw (store/index-writer directory iwc)]
       (index! iw doc-maps (dissoc opts :analyzer)))))
 
 (defmethod index! IndexWriter
-  [^IndexWriter iw doc-maps
-   {:keys [fields stored-fields indexed-fields suggest-fields keyword-fields context-fn]
-    :as   doc-opts}]
+  [^IndexWriter iw
+   doc-maps
+   {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn] :as doc-opts}]
   (let [doc-maps (if (map? doc-maps) [doc-maps] doc-maps)
-        ;doc-fn   (d/fn:map->document doc-opts)
-        doc-fn   (fn [doc-map] (d/map->document doc-map doc-opts))]
+        doc-fn   (d/fn:map->document doc-opts)]
     (doseq [document (map doc-fn doc-maps)]
       (.addDocument iw document))))
 
