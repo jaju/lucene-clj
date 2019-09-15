@@ -1,5 +1,4 @@
 #+BABEL: :session *clojure-nrepl* :cache yes :results value
-#+PROPERTY: header-args :exports both
 #+PROPERTY: noweb: yes
 
 * org.msync/lucene-clj [[http://travis-ci.org/jaju/lucene-clj][file:https://secure.travis-ci.org/jaju/lucene-clj.png]]
@@ -101,7 +100,7 @@ Or, on disk
   (def index (store/store "/path/to/index/directory" :analyzer album-data-analyzer))
 #+END_SRC
 
-#+BEGIN_SRC clojure :tangle no :results output code
+#+BEGIN_SRC clojure :tangle no :results output code :exports both
 (take 3 album-data)
 #+END_SRC
 
@@ -138,7 +137,7 @@ Or, on disk
 
 
 **** Now, we can search
-#+BEGIN_SRC clojure :results output code :tangle dev/user.clj
+#+BEGIN_SRC clojure :results output code :tangle dev/user.clj :exports both
   (lucene/search index {:Year "1967"}
                  {:results-per-page 5
                   :hit->doc         #(-> %
@@ -149,25 +148,25 @@ Or, on disk
 #+RESULTS:
 #+BEGIN_SRC clojure
 [{:hit {:Year "1967", :Album "Sgt. Pepper's Lonely Hearts Club Band"},
-  :score 1.4605205,
+  :score 1.4528096,
   :doc-id 0}
  {:hit {:Year "1967", :Album "The Velvet Underground & Nico"},
-  :score 1.4605205,
+  :score 1.4528096,
   :doc-id 12}
  {:hit {:Year "1967", :Album "Are You Experienced"},
-  :score 1.4605205,
+  :score 1.4528096,
   :doc-id 14}
  {:hit {:Year "1967", :Album "Forever Changes"},
-  :score 1.4605205,
+  :score 1.4528096,
   :doc-id 39}
  {:hit {:Year "1967", :Album "The Doors"},
-  :score 1.4605205,
+  :score 1.4528096,
   :doc-id 41}]
 #+END_SRC
 
 **** We can ask for suggestions on the fields indexed to support it
 From before, notice that the fields `Album` and `Artist` have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
-#+BEGIN_SRC clojure :results output code :tangle dev/user.clj
+#+BEGIN_SRC clojure :results output code :tangle dev/user.clj :exports both
 (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})
 #+END_SRC
 
@@ -185,7 +184,7 @@ From before, notice that the fields `Album` and `Artist` have been marked to be 
 #+END_SRC
 
 We can ask for fuzzy matching when querying for suggestions.
-#+BEGIN_SRC clojure :results output code :tangle dev/user.clj
+#+BEGIN_SRC clojure :results output code :tangle dev/user.clj :exports both
 (lucene/suggest index :Album "per" {:hit->doc ld/document->map :fuzzy? true :contexts ["Electronic"]})
 #+END_SRC
 
@@ -212,7 +211,7 @@ We can ask for fuzzy matching when querying for suggestions.
 #+END_SRC
 
 **** Or, do a fuzzy search
-#+BEGIN_SRC clojure :results output code m:tangle dev/user.clj
+#+BEGIN_SRC clojure :results output code m:tangle dev/user.clj :exports both
   (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true})
 #+END_SRC
 
