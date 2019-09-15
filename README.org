@@ -1,4 +1,5 @@
 #+BABEL: :session *clojure-nrepl* :cache yes :results value
+#+PROPERTY: header-args :exports both
 #+PROPERTY: noweb: yes
 
 * org.msync/lucene-clj [[http://travis-ci.org/jaju/lucene-clj][file:https://secure.travis-ci.org/jaju/lucene-clj.png]]
@@ -96,8 +97,8 @@ In memory
 #+END_SRC
 
 Or, on disk
-#+BEGIN_SRC :tangle no :results none
-  (def store (store/store "/path/to/index/directory" :analyzer album-data-analyzer))
+#+BEGIN_SRC clojure :tangle no :results none
+  (def index (store/store "/path/to/index/directory" :analyzer album-data-analyzer))
 #+END_SRC
 
 #+BEGIN_SRC clojure :tangle no :results output code
