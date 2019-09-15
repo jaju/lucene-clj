@@ -80,7 +80,7 @@ _Given_
 
 **** Preamble
 #+BEGIN_SRC clojure :tangle dev/dev.clj
-  (ns user
+  (ns dev
     (:require [msync.lucene :as lucene]
               [msync.lucene
                [analyzers :refer [standard-analyzer]]

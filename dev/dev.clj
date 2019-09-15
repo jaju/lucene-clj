@@ -1,4 +1,4 @@
-(ns user
+(ns dev
   (:require [msync.lucene :as lucene]
             [msync.lucene
              [analyzers :refer [standard-analyzer]]
