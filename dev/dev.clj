@@ -1,7 +1,6 @@
 (ns dev
   (:require [msync.lucene :as lucene]
             [msync.lucene
-             [analyzers :refer [standard-analyzer]]
              [store :as store]
              [document :as ld]
              [tests-common :refer :all]]))
@@ -13,8 +12,9 @@
                 :suggest-fields [:Album :Artist]
                 :stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]})
 
-(clojure.pprint/pprint (do (lucene/search index {:Year "1967"}
-               {:results-per-page 5
+(clojure.pprint/pprint (do (lucene/search index 
+               {:Year "1968"} ;; Map of field-values to search with
+               {:results-per-page 5 ;; Control the number of results returned
                 :hit->doc         #(-> %
                                        ld/document->map
                                        (select-keys [:Year :Album]))})))

@@ -33,21 +33,18 @@ This is imagined as a light-weight library for cheaply creating search indexes f
 - Support for _suggestions_ - a feature of Lucene I found quite undocumented, as well as lacking good examples for.
 - Up-to-date with the latest Lucene as on date.
 
-I am thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
+I am thankful to the above library authors for their liberal licensing. I've used their ideas/code liberally in places.
 
 
 ** Usage
 
-This section is /WIP/.
-
-Note: There's sample data in the repository that we use. A hand-created list is [here](test-resources/sample-data.csv) and one from Kaggle is [here](test-resources/albumlist.csv). These are also used in the tests.
+Note: There's sample data in the repository that we use. A hand-created list is [[file:test-resources/sample-data.csv][here]] and one from Kaggle is [[file:test-resources/albumlist.csv][here]]. These are also used in the tests.
 
 _Given_
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   (ns msync.lucene.tests-common
     (:require [msync.lucene
                [analyzers :as analyzers]]
-              [clojure.test :refer :all]
               [msync.lucene.utils :as utils]
               [clojure.data.csv :as csv]
               [clojure.java.io :as io]))
@@ -79,15 +76,22 @@ _Given_
 ***  Some simple REPL-runs
 
 **** Preamble
-#+BEGIN_SRC clojure :tangle dev/dev.clj
+#+BEGIN_SRC clojure :tangle dev/dev.clj :results none
   (ns dev
     (:require [msync.lucene :as lucene]
               [msync.lucene
-               [analyzers :refer [standard-analyzer]]
                [store :as store]
                [document :as ld]
                [tests-common :refer :all]]))
 #+END_SRC
+
+**** COMMENT Switch namespace
+#+BEGIN_SRC clojure
+(in-ns 'dev)
+#+END_SRC
+
+#+RESULTS:
+: nil
 
 **** Create an index
 In memory
@@ -100,6 +104,7 @@ Or, on disk
   (def index (store/store "/path/to/index/directory" :analyzer album-data-analyzer))
 #+END_SRC
 
+Sample album data for reference
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
 (take 3 album-data)
 #+END_SRC
@@ -128,6 +133,11 @@ Or, on disk
 
 
 **** Index documents - which are Clojure maps
+Documents are Clojure maps. The options passed to the `index!` function control behavior in various ways
+- /:context-fn/ - Lucene allows for a list of contexts to associate with the /suggest/ fields, which allow us to filter on them while querying for suggestions.
+- /:suggest-fields/ - Fields that are treated specially during indexing, allowing Lucene to create internal structures for quick prefix matching.
+- /:stored-fields/ - Lucene can index for efficient searching, but to save space, it need not store all the field values. If you want Lucene to also store the contents, pass them as a collection to this argument.
+
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
   (lucene/index! index album-data
                  {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
@@ -138,8 +148,9 @@ Or, on disk
 
 **** Now, we can search
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index {:Year "1967"}
-                 {:results-per-page 5
+  (lucene/search index 
+                 {:Year "1968"} ;; Map of field-values to search with
+                 {:results-per-page 5 ;; Control the number of results returned
                   :hit->doc         #(-> %
                                          ld/document->map
                                          (select-keys [:Year :Album]))})
@@ -147,25 +158,26 @@ Or, on disk
 
 #+RESULTS:
 #+BEGIN_SRC clojure
-[{:hit {:Year "1967", :Album "Sgt. Pepper's Lonely Hearts Club Band"},
-  :score 1.4528096,
-  :doc-id 0}
- {:hit {:Year "1967", :Album "The Velvet Underground & Nico"},
-  :score 1.4528096,
-  :doc-id 12}
- {:hit {:Year "1967", :Album "Are You Experienced"},
-  :score 1.4528096,
-  :doc-id 14}
- {:hit {:Year "1967", :Album "Forever Changes"},
-  :score 1.4528096,
-  :doc-id 39}
- {:hit {:Year "1967", :Album "The Doors"},
-  :score 1.4528096,
-  :doc-id 41}]
+[{:hit {:Year "1968", :Album "The Beatles (\"The White Album\")"},
+  :score 1.4311604,
+  :doc-id 9}
+ {:hit {:Year "1968", :Album "Astral Weeks"},
+  :score 1.4311604,
+  :doc-id 18}
+ {:hit {:Year "1968", :Album "Music From Big Pink"},
+  :score 1.4311604,
+  :doc-id 33}
+ {:hit {:Year "1968", :Album "Electric Ladyland"},
+  :score 1.4311604,
+  :doc-id 54}
+ {:hit {:Year "1968", :Album "Beggars Banquet"},
+  :score 1.4311604,
+  :doc-id 57}]
 #+END_SRC
 
 **** We can ask for suggestions on the fields indexed to support it
 From before, notice that the fields `Album` and `Artist` have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
+
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})
 #+END_SRC
@@ -313,6 +325,7 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 #+END_SRC
 
 - Phrase search
+
   Spaces in the query string are inferred to mean a phrase search operation
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
   (lucene/search index {:Album "the sun"} {:hit->doc ld/document->map})
@@ -348,6 +361,28 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
   :score 2.544825,
   :doc-id 310}]
 #+END_SRC
+
+- Searching across fields
+
+This is an /AND/ operation
+
+#+BEGIN_SRC clojure :tangle no :results output code :exports both
+  (lucene/search index {:Album "the sun" :Year "1976"} {:hit->doc ld/document->map})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit
+  {:Number "11",
+   :Year "1976",
+   :Album "The Sun Sessions",
+   :Artist "Elvis Presley",
+   :Genre "Rock",
+   :Subgenre "Rock & Roll"},
+  :score 4.56387,
+  :doc-id 10}]
+#+END_SRC
+
 
 ** Sample Datasets
 1. [[https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone][Albums - Kaggle]] - [[[file:test-resources/albumlist.csv][local]]]
