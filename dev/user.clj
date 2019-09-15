@@ -1,36 +1,24 @@
 (ns user
-  (:require [clojure.data.csv :as csv]
-            [clojure.java.io :as io]
-            [msync.lucene :as lucene]
+  (:require [msync.lucene :as lucene]
             [msync.lucene
              [analyzers :refer [standard-analyzer]]
              [store :as store]
-             [utils :as utils]
              [document :as ld]
-             [tests-common :refer :all]])
-  (:import [org.apache.lucene.index Term]
-           [org.apache.lucene.search.suggest.document PrefixCompletionQuery SuggestIndexSearcher Completion50PostingsFormat]
-           [org.apache.lucene.codecs.lucene80 Lucene80Codec]))
+             [tests-common :refer :all]]))
 
+(def index (store/store :memory :analyzer album-data-analyzer))
 
-(comment
+(lucene/index! index album-data
+               {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
+                :suggest-fields [:Album :Artist]
+                :stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]})
 
-  album-data-analyzer
-  sample-data
-  album-data
+(clojure.pprint/pprint (do (lucene/search index {:Year "1967"}
+               {:results-per-page 5
+                :hit->doc         #(-> %
+                                       ld/document->map
+                                       (select-keys [:Year :Album]))})))
 
-  (def index (store/store :memory :analyzer album-data-analyzer))
+(clojure.pprint/pprint (do (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})))
 
-  (lucene/index! index album-data
-                 {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
-                  :suggest-fields [:Album :Artist]
-                  :stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]})
-
-  (lucene/search index {:Year "1967"}
-                 {:results-per-page 5
-                  :hit->doc         #(-> %
-                                         ld/document->map
-                                         (select-keys [:Year :Album]))})
-
-  (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})
-  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true}))
+(clojure.pprint/pprint (do (lucene/suggest index :Album "per" {:hit->doc ld/document->map :fuzzy? true :contexts ["Electronic"]})))

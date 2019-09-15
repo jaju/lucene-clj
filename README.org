@@ -1,3 +1,6 @@
+#+BABEL: :session *clojure-nrepl* :cache yes :results value
+#+PROPERTY: noweb: yes
+
 * org.msync/lucene-clj [[http://travis-ci.org/jaju/lucene-clj][file:https://secure.travis-ci.org/jaju/lucene-clj.png]]
 
 A Clojure wrapper for Apache Lucene.
@@ -24,86 +27,258 @@ Notably
 
 ** Why?
 
-When I found out the above inspirations, there were a few aspects that I wanted different.
+This is imagined as a light-weight library for cheaply creating search indexes for simple scenarios. Any updates to the index are suggested to be done via create-a-new-index-and-switch approach. The objectives are loosely as follows.
 
-- Up-to-date with the latest Lucene as on date
-- Stick to _core_ Lucene. No script/language specific dependencies part of the core language. Except, maybe, English.
+- Stick to _core_ Lucene. No script/language specific dependencies part of the core language, but can be added by users per need.
 - Support for _suggestions_ - a feature of Lucene I found quite undocumented, as well as lacking good examples for.
+- Up-to-date with the latest Lucene as on date.
 
-I am sincerely thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
-Bad implementation ideas are my own, of course.
+I am thankful to the above library authors for their liberal licensing. I used them for inspiration and ideas.
 
 
 ** Usage
 
-_To be completed_. 
+This section is /WIP/.
 
-Note: There are some samples to look at in the tests as well. A sample data-set exists in [here](test-resources/sample-data.csv) and [here](test-resources/albumlist.csv),
-which is used in the tests.
+Note: There's sample data in the repository that we use. A hand-created list is [here](test-resources/sample-data.csv) and one from Kaggle is [here](test-resources/albumlist.csv). These are also used in the tests.
 
 _Given_
-#+BEGIN_SRC clojure
-(require '[msync.lucene :as lucene])
-(require '[msync.lucene.query :as query])
+#+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
+  (ns msync.lucene.tests-common
+    (:require [msync.lucene
+               [analyzers :as analyzers]]
+              [clojure.test :refer :all]
+              [msync.lucene.utils :as utils]
+              [clojure.data.csv :as csv]
+              [clojure.java.io :as io]))
+
+  (defonce sample-data (-> "sample-data.csv"
+                           io/resource
+                           slurp
+                           csv/read-csv
+                           utils/docs:vecs->maps))
+
+  (defonce album-data (-> "albumlist.csv"
+                          io/resource
+                          slurp
+                          csv/read-csv
+                          utils/docs:vecs->maps))
+
+  (defonce default-analyzer (analyzers/standard-analyzer))
+  (defonce keyword-analyzer (analyzers/keyword-analyzer))
+
+  ;; A per-field analyzer, which composes other kinds of analyzers
+  (defonce album-data-analyzer
+    (analyzers/per-field-analyzer default-analyzer
+                                  {:Year     keyword-analyzer
+                                   :Genre    keyword-analyzer
+                                   :Subgenre keyword-analyzer}))
 #+END_SRC
 
-***  A simple but complete example
+
+***  Some simple REPL-runs
+
+**** Preamble
+#+BEGIN_SRC clojure :tangle dev/user.clj
+  (ns user
+    (:require [msync.lucene :as lucene]
+              [msync.lucene
+               [analyzers :refer [standard-analyzer]]
+               [store :as store]
+               [document :as ld]
+               [tests-common :refer :all]]))
+#+END_SRC
 
 **** Create an index
-#+BEGIN_SRC clojure
-  (def store (lucene/create-store :memory)) ; In-memory index
-  ; OR
-  (def store (lucene/create-store "/path/to/index/directory")) ; On disk
+In memory
+#+BEGIN_SRC clojure :tangle dev/user.clj :results none
+  (def index (store/store :memory :analyzer album-data-analyzer))
 #+END_SRC
 
-**** Index a document. Use Clojure maps
-#+BEGIN_SRC clojure
-  (lucene/index! store
-                 [{:name "Ram" :description "A just king. Ethical. Read more in Ramayan."}
-                  {:name "Ravan" :description "A scary king. Ethical villain. Read more in Ramayan."}
-                  {:name "Krishna" :description "An adorable king. Pragmatic. Read about him in the Mahabharat."}]
-                 {:suggest-fields {:name 5}})
+Or, on disk
+#+BEGIN_SRC :tangle no :results none
+  (def store (store/store "/path/to/index/directory" :analyzer album-data-analyzer))
 #+END_SRC
 
+#+BEGIN_SRC clojure :tangle no :results output code
+(take 3 album-data)
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+({:Number "1",
+  :Year "1967",
+  :Album "Sgt. Pepper's Lonely Hearts Club Band",
+  :Artist "The Beatles",
+  :Genre "Rock",
+  :Subgenre "Rock & Roll, Psychedelic Rock"}
+ {:Number "2",
+  :Year "1966",
+  :Album "Pet Sounds",
+  :Artist "The Beach Boys",
+  :Genre "Rock",
+  :Subgenre "Pop Rock, Psychedelic Rock"}
+ {:Number "3",
+  :Year "1966",
+  :Album "Revolver",
+  :Artist "The Beatles",
+  :Genre "Rock",
+  :Subgenre "Psychedelic Rock, Pop Rock"})
+#+END_SRC
+
+
+**** Index documents - which are Clojure maps
+#+BEGIN_SRC clojure :tangle dev/user.clj :results none
+  (lucene/index! index album-data
+                 {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
+                  :suggest-fields [:Album :Artist]
+                  :stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]})
+#+END_SRC
+
+
+**** Now, we can search
+#+BEGIN_SRC clojure :results output code :tangle dev/user.clj
+  (lucene/search index {:Year "1967"}
+                 {:results-per-page 5
+                  :hit->doc         #(-> %
+                                         ld/document->map
+                                         (select-keys [:Year :Album]))})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit {:Year "1967", :Album "Sgt. Pepper's Lonely Hearts Club Band"},
+  :score 1.4605205,
+  :doc-id 0}
+ {:hit {:Year "1967", :Album "The Velvet Underground & Nico"},
+  :score 1.4605205,
+  :doc-id 12}
+ {:hit {:Year "1967", :Album "Are You Experienced"},
+  :score 1.4605205,
+  :doc-id 14}
+ {:hit {:Year "1967", :Album "Forever Changes"},
+  :score 1.4605205,
+  :doc-id 39}
+ {:hit {:Year "1967", :Album "The Doors"},
+  :score 1.4605205,
+  :doc-id 41}]
+#+END_SRC
+
+**** We can ask for suggestions on the fields indexed to support it
+From before, notice that the fields `Album` and `Artist` have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
+#+BEGIN_SRC clojure :results output code :tangle dev/user.clj
+(lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit
+  {:Number "140",
+   :Year "1978",
+   :Album "Parallel Lines",
+   :Artist "Blondie",
+   :Genre "Electronic, Rock",
+   :Subgenre "New Wave, Pop Rock, Punk, Disco"},
+  :score 1.0,
+  :doc-id 139}]
+#+END_SRC
+
+We can ask for fuzzy matching when querying for suggestions.
+#+BEGIN_SRC clojure :results output code :tangle dev/user.clj
+(lucene/suggest index :Album "per" {:hit->doc ld/document->map :fuzzy? true :contexts ["Electronic"]})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit
+  {:Number "140",
+   :Year "1978",
+   :Album "Parallel Lines",
+   :Artist "Blondie",
+   :Genre "Electronic, Rock",
+   :Subgenre "New Wave, Pop Rock, Punk, Disco"},
+  :score 2.0,
+  :doc-id 139}
+ {:hit
+  {:Number "76",
+   :Year "1984",
+   :Album "Purple Rain",
+   :Artist "Prince and the Revolution",
+   :Genre "Electronic, Rock, Funk / Soul, Stage & Screen",
+   :Subgenre "Pop Rock, Funk, Soundtrack, Synth-pop"},
+  :score 2.0,
+  :doc-id 75}]
+#+END_SRC
+
+**** Or, do a fuzzy search
+#+BEGIN_SRC clojure :results output code m:tangle dev/user.clj
+  (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit
+  {:Number "40",
+   :Year "1967",
+   :Album "Forever Changes",
+   :Artist "Love",
+   :Genre "Rock",
+   :Subgenre "Folk Rock, Psychedelic Rock"},
+  :score 3.0850306,
+  :doc-id 39}
+ {:hit
+  {:Number "132",
+   :Year "1977",
+   :Album "Saturday Night Fever: The Original Movie Sound Track",
+   :Artist "Various Artists",
+   :Genre "Electronic,�Stage & Screen",
+   :Subgenre "Soundtrack,�Disco"},
+  :score 0.95929563,
+  :doc-id 131}]
+#+END_SRC
 
 **** A brief note about the search and suggest results
 These function calls return a sequence of maps with the following structure for one map (may change!)
-#+BEGIN_SRC clojure
+#+BEGIN_SRC clojure :tangle no
   {:hit ^org.apache.lucene.document.Document Object
    :score 'float
    :doc-id 'number}
 #+END_SRC
 
 There's a convenience function to convert the Lucene _Document_ object to a Clojure map.
-#+BEGIN_SRC clojure
-  (require '[msync.lucene.document :as d])
-  (d/document->map (:hit 'one-response))
+#+BEGIN_SRC clojure :tangle no
+  (require '[msync.lucene.document :as ld])
+  (ld/document->map (:hit 'one-response))
   ;; In bulk
   (->> (lucene/search store "query-string" {:field-name "field-name-to-search-in"})
        (map :hit)
-       (map d/document->map))
+       (map ld/document->map))
 #+END_SRC
 
 
-**** Search
-#+BEGIN_SRC clojure
-(lucene/search store {:name "Ram"})
+**** Search variations
 
+- Simple search
+#+BEGIN_SRC clojure :tangle no :results no
+(lucene/search index {:Year "1967"})
+#+END_SRC
+
+- OR Search
+#+BEGIN_SRC clojure :tangle no :results none
 ;; Search for either Ram or Krishna
-(lucene/search store {:name #{"Krishna" "Ram"}})
+(lucene/search index {:Year #{"1967" "1968"}})
+#+END_SRC
+
+- AND Search
+#+BEGIN_SRC clojure
+(lucene/search index {:Year ["1967" "1968"]}) ;; No results
 #+END_SRC
 
 **** Phrase search
-#+BEGIN_SRC clojure
+#+BEGIN_SRC clojure :tangle no 
   ;; Space(s) in the query string are inferred to mean a phrase search operation
-  (lucene/search store {:description "read more"})
+  (lucene/search index {:Album "the sun"})
 #+END_SRC
-
-**** Suggestion
-#+BEGIN_SRC clojure
-(lucene/suggest store :name "Ra")
-#+END_SRC
-
 
 ** Sample Datasets
 1. [[https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone][Albums - Kaggle]] - [[[file:test-resources/albumlist.csv][local]]]
