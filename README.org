@@ -79,7 +79,7 @@ _Given_
 ***  Some simple REPL-runs
 
 **** Preamble
-#+BEGIN_SRC clojure :tangle dev/user.clj
+#+BEGIN_SRC clojure :tangle dev/dev.clj
   (ns user
     (:require [msync.lucene :as lucene]
               [msync.lucene
@@ -91,7 +91,7 @@ _Given_
 
 **** Create an index
 In memory
-#+BEGIN_SRC clojure :tangle dev/user.clj :results none
+#+BEGIN_SRC clojure :tangle dev/dev.clj :results none
   (def index (store/store :memory :analyzer album-data-analyzer))
 #+END_SRC
 
@@ -128,7 +128,7 @@ Or, on disk
 
 
 **** Index documents - which are Clojure maps
-#+BEGIN_SRC clojure :tangle dev/user.clj :results none
+#+BEGIN_SRC clojure :tangle dev/dev.clj :results none
   (lucene/index! index album-data
                  {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
                   :suggest-fields [:Album :Artist]
@@ -137,7 +137,7 @@ Or, on disk
 
 
 **** Now, we can search
-#+BEGIN_SRC clojure :results output code :tangle dev/user.clj :exports both
+#+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
   (lucene/search index {:Year "1967"}
                  {:results-per-page 5
                   :hit->doc         #(-> %
@@ -166,7 +166,7 @@ Or, on disk
 
 **** We can ask for suggestions on the fields indexed to support it
 From before, notice that the fields `Album` and `Artist` have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
-#+BEGIN_SRC clojure :results output code :tangle dev/user.clj :exports both
+#+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})
 #+END_SRC
 
@@ -184,7 +184,7 @@ From before, notice that the fields `Album` and `Artist` have been marked to be 
 #+END_SRC
 
 We can ask for fuzzy matching when querying for suggestions.
-#+BEGIN_SRC clojure :results output code :tangle dev/user.clj :exports both
+#+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/suggest index :Album "per" {:hit->doc ld/document->map :fuzzy? true :contexts ["Electronic"]})
 #+END_SRC
 
@@ -211,7 +211,7 @@ We can ask for fuzzy matching when querying for suggestions.
 #+END_SRC
 
 **** Or, do a fuzzy search
-#+BEGIN_SRC clojure :results output code m:tangle dev/user.clj :exports both
+#+BEGIN_SRC clojure :results output code m:tangle dev/dev.clj :exports both
   (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true})
 #+END_SRC
 
