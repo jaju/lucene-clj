@@ -264,20 +264,89 @@ There's a convenience function to convert the Lucene _Document_ object to a Cloj
 #+END_SRC
 
 - OR Search
-#+BEGIN_SRC clojure :tangle no :results none
-;; Search for either Ram or Krishna
-(lucene/search index {:Year #{"1967" "1968"}})
+#+BEGIN_SRC clojure :tangle no :results output code :exports both
+(lucene/search index {:Year #{"1964" "1965"}} {:hit->doc #(-> % ld/document->map (select-keys [:Year :Album]))})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit {:Year "1964", :Album "Meet The Beatles!"},
+  :score 2.1420584,
+  :doc-id 52}
+ {:hit {:Year "1964", :Album "Folk Singer"},
+  :score 2.1420584,
+  :doc-id 281}
+ {:hit {:Year "1964", :Album "A Hard Day's Night"},
+  :score 2.1420584,
+  :doc-id 306}
+ {:hit {:Year "1964", :Album "Getz / Gilberto"},
+  :score 2.1420584,
+  :doc-id 446}
+ {:hit {:Year "1965", :Album "Highway 61 Revisited"},
+  :score 1.6102078,
+  :doc-id 3}
+ {:hit {:Year "1965", :Album "Rubber Soul"},
+  :score 1.6102078,
+  :doc-id 4}
+ {:hit {:Year "1965", :Album "Bringing It All Back Home"},
+  :score 1.6102078,
+  :doc-id 30}
+ {:hit {:Year "1965", :Album "A Love Supreme"},
+  :score 1.6102078,
+  :doc-id 46}
+ {:hit {:Year "1965", :Album "Otis Blue: Otis Redding Sings Soul"},
+  :score 1.6102078,
+  :doc-id 77}
+ {:hit {:Year "1965", :Album "Out of Our Heads"},
+  :score 1.6102078,
+  :doc-id 115}]
 #+END_SRC
 
 - AND Search
-#+BEGIN_SRC clojure
-(lucene/search index {:Year ["1967" "1968"]}) ;; No results
+#+BEGIN_SRC clojure :tangle no :results output code :exports both
+(lucene/search index {:Year ["1964" "1965"]})
 #+END_SRC
 
-**** Phrase search
-#+BEGIN_SRC clojure :tangle no 
-  ;; Space(s) in the query string are inferred to mean a phrase search operation
-  (lucene/search index {:Album "the sun"})
+#+RESULTS:
+#+BEGIN_SRC clojure
+[]
+#+END_SRC
+
+- Phrase search
+  Spaces in the query string are inferred to mean a phrase search operation
+#+BEGIN_SRC clojure :tangle no :results output code :exports both
+  (lucene/search index {:Album "the sun"} {:hit->doc ld/document->map})
+#+END_SRC
+
+#+RESULTS:
+#+BEGIN_SRC clojure
+[{:hit
+  {:Number "11",
+   :Year "1976",
+   :Album "The Sun Sessions",
+   :Artist "Elvis Presley",
+   :Genre "Rock",
+   :Subgenre "Rock & Roll"},
+  :score 2.8861985,
+  :doc-id 10}
+ {:hit
+  {:Number "288",
+   :Year "1968",
+   :Album "Anthem of the Sun",
+   :Artist "Grateful Dead",
+   :Genre "Rock",
+   :Subgenre "Psychedelic Rock"},
+  :score 2.544825,
+  :doc-id 287}
+ {:hit
+  {:Number "311",
+   :Year "1994",
+   :Album "The Sun Records Collection",
+   :Artist "Various",
+   :Genre "Rock, Funk / Soul, Blues, Pop, Folk, World, & Country",
+   :Subgenre "Country Blues, Rock & Roll, Rockabilly"},
+  :score 2.544825,
+  :doc-id 310}]
 #+END_SRC
 
 ** Sample Datasets
