@@ -148,31 +148,20 @@ Documents are Clojure maps. The options passed to the `index!` function control 
 
 **** Now, we can search
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index 
-                 {:Year "1968"} ;; Map of field-values to search with
-                 {:results-per-page 5 ;; Control the number of results returned
-                  :hit->doc         #(-> %
-                                         ld/document->map
-                                         (select-keys [:Year :Album]))})
+    (lucene/search index 
+                   {:Year "1968"} ;; Map of field-values to search with
+                   {:results-per-page 5 ;; Control the number of results returned
+                    :page 4             ;; Page number, starting 0 as default
+                    :hit->doc         #(-> %
+                                           ld/document->map
+                                           (select-keys [:Year :Album]))})
 #+END_SRC
 
 #+RESULTS:
 #+BEGIN_SRC clojure
-[{:hit {:Year "1968", :Album "The Beatles (\"The White Album\")"},
+[{:hit {:Year "1968", :Album "The Drifters' Golden Hits"},
   :score 1.4311604,
-  :doc-id 9}
- {:hit {:Year "1968", :Album "Astral Weeks"},
-  :score 1.4311604,
-  :doc-id 18}
- {:hit {:Year "1968", :Album "Music From Big Pink"},
-  :score 1.4311604,
-  :doc-id 33}
- {:hit {:Year "1968", :Album "Electric Ladyland"},
-  :score 1.4311604,
-  :doc-id 54}
- {:hit {:Year "1968", :Album "Beggars Banquet"},
-  :score 1.4311604,
-  :doc-id 57}]
+  :doc-id 458}]
 #+END_SRC
 
 **** We can ask for suggestions on the fields indexed to support it

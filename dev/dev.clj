@@ -15,6 +15,7 @@
 (clojure.pprint/pprint (do (lucene/search index 
                {:Year "1968"} ;; Map of field-values to search with
                {:results-per-page 5 ;; Control the number of results returned
+                :page 4             ;; Page number, starting 0 as default
                 :hit->doc         #(-> %
                                        ld/document->map
                                        (select-keys [:Year :Album]))})))

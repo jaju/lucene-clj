@@ -60,9 +60,8 @@
 
 (defmethod search* IndexReader
   [^IndexReader index-store query-form
-   {:keys [field-name results-per-page max-results analyzer hit->doc page fuzzy?]
+   {:keys [field-name results-per-page analyzer hit->doc page fuzzy?]
     :or   {results-per-page 10
-           max-results      results-per-page
            page             0
            hit->doc         identity
            fuzzy?           false}}]
@@ -71,9 +70,9 @@
         ^Query query            (if fuzzy?
                                   (combine-fuzzy-queries query-form)
                                   (query/parse query-form {:analyzer analyzer :field-name field-name}))
-        ^TopDocs hits           (.search searcher query (int max-results))
+        ^TopDocs hits           (.search searcher query (+ (* page results-per-page) results-per-page))
         start                   (* page results-per-page)
-        end                     (min (+ start results-per-page) max-results (.value (.totalHits hits)))]
+        end                     (min (+ start results-per-page) (.value (.totalHits hits)))]
     (vec
       (for [^ScoreDoc hit (map (partial aget (.scoreDocs hits))
                                (range start end))]
