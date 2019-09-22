@@ -232,7 +232,7 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
     (lucene/search index {:Year "1979"}
                    {:results-per-page 2
-                    :hit->doc #(ld/document->map % :multi-fields #{:Genre :Subgenre})})
+                    :hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])})
 #+END_SRC
 
 #+RESULTS:
@@ -242,8 +242,8 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
    :Year "1979",
    :Album "London Calling",
    :Artist "The Clash",
-   :Genre ["Rock"],
-   :Subgenre ["Punk" "New Wave"]},
+   :Genre "Rock",
+   :Subgenre "New Wave"},
   :score 1.6102078,
   :doc-id 7}
  {:hit
@@ -251,8 +251,8 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
    :Year "1979",
    :Album "Off the Wall",
    :Artist "Michael Jackson",
-   :Genre ["Funk / Soul" "Pop"],
-   :Subgenre ["Disco" "Soul" "Ballad"]},
+   :Genre "Pop",
+   :Subgenre "Ballad"},
   :score 1.6102078,
   :doc-id 67}]
 #+END_SRC
@@ -275,6 +275,7 @@ Paginated query results are supported via the /:page/ option. Also, the followin
   :score 1.4311604,
   :doc-id 458}]
 #+END_SRC
+
 
 **** Search variations
 
@@ -403,7 +404,7 @@ From above, the fields `Album` and `Artist` have been marked to be indexed in a 
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
   (lucene/suggest index :Album "par"
-                  {:hit->doc #(ld/document->map % :multi-fields #{:Genre :Subgenre})
+                  {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
                    :fuzzy? false
                    :contexts ["Electronic"]})
 #+END_SRC
@@ -424,7 +425,7 @@ From above, the fields `Album` and `Artist` have been marked to be indexed in a 
 We can ask for fuzzy matching when querying for suggestions.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
   (lucene/suggest index :Album "per"
-                  {:hit->doc #(ld/document->map % :multi-fields #{:Genre :Subgenre})
+                  {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
                    :fuzzy? true
                    :contexts ["Electronic"]})
 #+END_SRC
@@ -455,7 +456,7 @@ We can ask for fuzzy matching when querying for suggestions.
 **** Or, do a fuzzy search
 #+BEGIN_SRC clojure :results output code m:tangle dev/dev.clj :exports both
   (lucene/search index {:Album "forever"}
-                 {:hit->doc #(ld/document->map % :multi-fields #{:Genre :Subgenre})
+                 {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
                   :fuzzy? true})
 #+END_SRC
 

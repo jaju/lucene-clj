@@ -103,7 +103,8 @@
                          :or   {multi-fields #{} fields-to-keep :all}}]
   (let [fields-to-keep (if (= :all fields-to-keep)
                          (constantly true)
-                         fields-to-keep)]
+                         fields-to-keep)
+        multi-fields   (into #{} multi-fields)]
     (reduce
       (fn [m ^Field field]
         (let [[k v] (field->kv field)]
