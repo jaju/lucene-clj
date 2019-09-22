@@ -7,14 +7,14 @@
             [clojure.java.io :as io]
             [clojure.string :as s]))
 
-(defn- process-column [coll column]
+(defn- process-csv-column [coll column]
   (assoc coll column
          (map s/trim (s/split (get coll column) #","))))
 
 (defn process-album-data-row [row]
   (-> row
-      (process-column :Genre)
-      (process-column :Subgenre)))
+      (process-csv-column :Genre)
+      (process-csv-column :Subgenre)))
 
 (defonce sample-data (-> "sample-data.csv"
                          io/resource
