@@ -242,8 +242,8 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
    :Year "1979",
    :Album "London Calling",
    :Artist "The Clash",
-   :Genre "Rock",
-   :Subgenre "New Wave"},
+   :Genre ["Rock"],
+   :Subgenre ["Punk" "New Wave"]},
   :score 1.6102078,
   :doc-id 7}
  {:hit
@@ -251,8 +251,8 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
    :Year "1979",
    :Album "Off the Wall",
    :Artist "Michael Jackson",
-   :Genre "Pop",
-   :Subgenre "Ballad"},
+   :Genre ["Funk / Soul" "Pop"],
+   :Subgenre ["Disco" "Soul" "Ballad"]},
   :score 1.6102078,
   :doc-id 67}]
 #+END_SRC
