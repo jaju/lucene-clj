@@ -1,4 +1,5 @@
 #+BABEL: :session *clojure-nrepl* :cache yes :results value
+#+PROPERTY: header-args :comments link
 #+PROPERTY: noweb: yes
 
 * org.msync/lucene-clj [[http://travis-ci.org/jaju/lucene-clj][file:https://secure.travis-ci.org/jaju/lucene-clj.png]]
@@ -9,6 +10,7 @@ The primary use-case is for in-process text search needs for *read-only* dataset
 Both in-memory, and on-disk indexes can be used depending on the dataset size.
 
 Note: *UNSTABLE* API. No releases yet, but coming soon.
+
 
 ** Dependency
 #+BEGIN_SRC clojure
@@ -40,14 +42,25 @@ I am thankful to the above library authors for their liberal licensing. I've use
 
 Note: There's sample data in the repository that we use. A hand-created list is [[file:test-resources/sample-data.csv][here]] and one from Kaggle is [[file:test-resources/albumlist.csv][here]]. These are also used in the tests.
 
-_Given_
+*** Given
+
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   (ns msync.lucene.tests-common
     (:require [msync.lucene
                [analyzers :as analyzers]]
               [msync.lucene.utils :as utils]
               [clojure.data.csv :as csv]
-              [clojure.java.io :as io]))
+              [clojure.java.io :as io]
+              [clojure.string :as s]))
+
+  (defn- process-column [coll column]
+    (assoc coll column
+           (map s/trim (s/split (get coll column) #","))))
+
+  (defn process-album-data-row [row]
+    (-> row
+        (process-column :Genre)
+        (process-column :Subgenre)))
 
   (defonce sample-data (-> "sample-data.csv"
                            io/resource
@@ -55,11 +68,12 @@ _Given_
                            csv/read-csv
                            utils/docs:vecs->maps))
 
-  (defonce album-data (-> "albumlist.csv"
-                          io/resource
-                          slurp
-                          csv/read-csv
-                          utils/docs:vecs->maps))
+  (def album-data (->> "albumlist.csv"
+                           io/resource
+                           slurp
+                           csv/read-csv
+                           utils/docs:vecs->maps
+                           (map process-album-data-row)))
 
   (defonce default-analyzer (analyzers/standard-analyzer))
   (defonce keyword-analyzer (analyzers/keyword-analyzer))
@@ -85,13 +99,14 @@ _Given_
                [tests-common :refer :all]]))
 #+END_SRC
 
+
 **** COMMENT Switch namespace
 #+BEGIN_SRC clojure
 (in-ns 'dev)
 #+END_SRC
 
 #+RESULTS:
-: nil
+
 
 **** Create an index
 In memory
@@ -111,24 +126,6 @@ Sample album data for reference
 
 #+RESULTS:
 #+BEGIN_SRC clojure
-({:Number "1",
-  :Year "1967",
-  :Album "Sgt. Pepper's Lonely Hearts Club Band",
-  :Artist "The Beatles",
-  :Genre "Rock",
-  :Subgenre "Rock & Roll, Psychedelic Rock"}
- {:Number "2",
-  :Year "1966",
-  :Album "Pet Sounds",
-  :Artist "The Beach Boys",
-  :Genre "Rock",
-  :Subgenre "Pop Rock, Psychedelic Rock"}
- {:Number "3",
-  :Year "1966",
-  :Album "Revolver",
-  :Artist "The Beatles",
-  :Genre "Rock",
-  :Subgenre "Psychedelic Rock, Pop Rock"})
 #+END_SRC
 
 
@@ -140,7 +137,7 @@ Documents are Clojure maps. The options passed to the `index!` function control 
 
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
   (lucene/index! index album-data
-                 {:context-fn     #(map clojure.string/trim (clojure.string/split (:Genre %) #","))
+                 {:context-fn     :Genre
                   :suggest-fields [:Album :Artist]
                   :stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]})
 #+END_SRC
@@ -163,6 +160,7 @@ Documents are Clojure maps. The options passed to the `index!` function control 
   :score 1.4311604,
   :doc-id 458}]
 #+END_SRC
+
 
 **** We can ask for suggestions on the fields indexed to support it
 From before, notice that the fields `Album` and `Artist` have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
@@ -211,6 +209,7 @@ We can ask for fuzzy matching when querying for suggestions.
   :doc-id 75}]
 #+END_SRC
 
+
 **** Or, do a fuzzy search
 #+BEGIN_SRC clojure :results output code m:tangle dev/dev.clj :exports both
   (lucene/search index {:Album "forever"} {:hit->doc ld/document->map :fuzzy? true})
@@ -237,6 +236,7 @@ We can ask for fuzzy matching when querying for suggestions.
   :score 0.95929563,
   :doc-id 131}]
 #+END_SRC
+
 
 **** A brief note about the search and suggest results
 These function calls return a sequence of maps with the following structure for one map (may change!)
@@ -377,8 +377,10 @@ This is an /AND/ operation
 1. [[https://www.kaggle.com/notgibs/500-greatest-albums-of-all-time-rolling-stone][Albums - Kaggle]] - [[[file:test-resources/albumlist.csv][local]]]
 2. Hand-created, real + fictional characters [[file:test-resources/sample-data.csv][here]]
 
+
 ** Additional notes
 - Some minimal technical overview of Lucene internals for this project can be found [[file:doc/LuceneNotes.org][here]].
+
 
 ** License
 Copyright © 2018-19 Ravindra R. Jaju

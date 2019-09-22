@@ -26,3 +26,6 @@ The /IndexWriter/ class is the (currently) only way to write to an index. Which 
 
 ** IndexSearcher, SuggestIndexSearcher
 These help in searching in indexes, via various kinds of /Query/ objects. The /SuggestIndexSearcher/ deals with /*CompletionQuery/ classes.
+
+* Suggestions
+There appear to be two different approaches in code to handling the implementation of /suggestions/. It isn't entirely clear how they differ, or which is to be preferred, as code examples to study aren't easy to come by.
