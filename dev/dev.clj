@@ -19,7 +19,7 @@
 ;; Index documents - which are Clojure maps:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Now,%20we%20can%20search][Now, we can search:1]]
-(clojure.pprint/pprint (do (lucene/search index {:Year "1967"}
+(clojure.pprint/pprint (do (lucene/search index {:Year "1979"}
                {:results-per-page 2})))
 ;; Now, we can search:1 ends here
 

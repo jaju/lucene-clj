@@ -47,7 +47,12 @@ Note: There's sample data in the repository that we use in our examples. A hand-
 
 *** Given
 
-Here's the background, used in the examples below as well as the tests. Hence the /tests-common/ namespace. Note that for the albums dataset, some of the columns - notably /genre/ and /sub-genre/, are comma-separated values themselves, and hence they are pre-processed before feeding to /lucene-clj/.
+Here's the background, used in the examples below as well as the tests. Hence the /tests-common/ namespace. 
+
+Note that for the albums dataset
+- The columns /:Genre/ and /:Subgenre/, are comma-separated values themselves
+  - They are pre-processed before feeding to /lucene-clj/
+- The /:Year/, /:Genre/ and /:Subgenre/ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/.
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   (ns msync.lucene.tests-common
@@ -177,20 +182,20 @@ A simple search example, in which we pass a /map/ specifying the field, and the 
 The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ which is an identifier that Lucene manages. Notice that the result - /:hit/ - is a Lucene /Document/ object.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index {:Year "1967"}
+  (lucene/search index {:Year "1979"}
                  {:results-per-page 2})
 #+END_SRC
 
 #+RESULTS:
 #+BEGIN_SRC clojure
 [{:hit
-  #object[org.apache.lucene.document.Document 0x5a2f2155 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:1> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1967> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Sgt. Pepper's Lonely Hearts Club Band> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Beatles> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Rock & Roll> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Psychedelic Rock>>"],
-  :score 1.4528096,
-  :doc-id 0}
+  #object[org.apache.lucene.document.Document 0x737ac0d8 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"],
+  :score 1.6102078,
+  :doc-id 7}
  {:hit
-  #object[org.apache.lucene.document.Document 0x141d9fbb "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:13> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1967> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:The Velvet Underground & Nico> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Velvet Underground> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Garage Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Art Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Experimental>>"],
-  :score 1.4528096,
-  :doc-id 12}]
+  #object[org.apache.lucene.document.Document 0x7303840f "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"],
+  :score 1.6102078,
+  :doc-id 67}]
 #+END_SRC
 
 For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map.
@@ -331,7 +336,7 @@ Be sure that your queries are semantically right for the dataset. For example, /
 #+END_SRC
 
 - Phrase search
-  Spaces in the query string are inferred to mean a phrase search operation
+Spaces in the query string are inferred to mean a phrase search operation
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
   (lucene/search index {:Album "the sun"} {:hit->doc ld/document->map})
 #+END_SRC
