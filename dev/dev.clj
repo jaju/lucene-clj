@@ -46,9 +46,15 @@
 ;; Now, we can search:7 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Suggestions%20support%20for%20fields%20passed%20via%20/:suggest-fields/][Suggestions support for fields passed via /:suggest-fields/:1]]
-(clojure.pprint/pprint (do (lucene/suggest index :Album "par" {:hit->doc ld/document->map :fuzzy? false :contexts ["Electronic"]})))
+(clojure.pprint/pprint (do (lucene/suggest index :Album "par"
+                {:hit->doc #(ld/document->map % :multi-fields #{:Genre :Subgenre})
+                 :fuzzy? false
+                 :contexts ["Electronic"]})))
 ;; Suggestions support for fields passed via /:suggest-fields/:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Suggestions%20support%20for%20fields%20passed%20via%20/:suggest-fields/][Suggestions support for fields passed via /:suggest-fields/:3]]
-(clojure.pprint/pprint (do (lucene/suggest index :Album "per" {:hit->doc ld/document->map :fuzzy? true :contexts ["Electronic"]})))
+(clojure.pprint/pprint (do (lucene/suggest index :Album "per"
+                {:hit->doc #(ld/document->map % :multi-fields #{:Genre :Subgenre})
+                 :fuzzy? true
+                 :contexts ["Electronic"]})))
 ;; Suggestions support for fields passed via /:suggest-fields/:3 ends here
