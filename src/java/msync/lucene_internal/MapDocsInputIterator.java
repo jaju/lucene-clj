@@ -26,35 +26,39 @@ public class MapDocsInputIterator implements InputIterator {
         _state = state;
     }
 
+    private Object _invoke(Keyword k) {
+        return _actions.get(k).invoke(_state);
+    }
+
     @Override
     public long weight() {
-        return (long) _actions.get(WEIGHT).invoke(_state);
+        return (long) _invoke(WEIGHT);
     }
 
     @Override
     public BytesRef payload() {
-        return (BytesRef) _actions.get(PAYLOAD).invoke(_state);
+        return (BytesRef) _invoke(PAYLOAD);
     }
 
     @Override
     public boolean hasPayloads() {
-        return (boolean) _actions.get(HAS_PAYLOAD).invoke(_state);
+        return (boolean) _invoke(HAS_PAYLOAD);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public Set<BytesRef> contexts() {
-        return (Set<BytesRef>) _actions.get(CONTEXTS).invoke(_state);
+        return (Set<BytesRef>) _invoke(CONTEXTS);
     }
 
     @Override
     public boolean hasContexts() {
-        return (boolean) _actions.get(HAS_CONTEXTS).invoke(_state);
+        return (boolean) _invoke(HAS_CONTEXTS);
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public BytesRef next() throws IOException {
-        return (BytesRef) _actions.get(NEXT).invoke(_state);
+        return (BytesRef) _invoke(NEXT);
     }
 }

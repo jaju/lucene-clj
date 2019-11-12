@@ -47,12 +47,15 @@ Note: There's sample data in the repository that we use in our examples. A hand-
 
 *** Given
 
-Here's the background, used in the examples below as well as the tests. Hence the /tests-common/ namespace. 
+Following is code to demonstrate how text can be prepared to be fed into Lucene for indexing. We use two CSV files as our source of /documents/, but the sources could very well be anything, as long as they are converted into maps before being indexed by /lucene-clj/.
 
-Note that for the albums dataset
-- The columns /:Genre/ and /:Subgenre/, are comma-separated values themselves
-  - They are pre-processed before feeding to /lucene-clj/
-- The /:Year/, /:Genre/ and /:Subgenre/ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/.
+A note on the datasets.
+- The albums dataset
+  - The columns /:Genre/ and /:Subgenre/, are comma-separated values themselves
+    - They are pre-processed before feeding to /lucene-clj/
+  - The /:Year/, /:Genre/ and /:Subgenre/ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/.
+
+Below, we consume the files from the resources classpath as set up for this project using Java's IO facilities, and then perform CSV to map conversion for each row.
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   (ns msync.lucene.tests-common
