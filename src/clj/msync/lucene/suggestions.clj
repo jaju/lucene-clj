@@ -3,9 +3,9 @@
   (:import [org.apache.lucene.search ScoreDoc]
            [org.apache.lucene.search.suggest.document
             TopSuggestDocs SuggestIndexSearcher ContextQuery
-            PrefixCompletionQuery FuzzyCompletionQuery Completion50PostingsFormat CompletionQuery]
+            PrefixCompletionQuery FuzzyCompletionQuery Completion84PostingsFormat CompletionQuery]
            [org.apache.lucene.index Term IndexReader]
-           [org.apache.lucene.codecs.lucene80 Lucene80Codec]))
+           [org.apache.lucene.codecs.lucene84 Lucene84Codec]))
 
 
 (defn create-filter-codec-for-suggestions
@@ -13,8 +13,8 @@
   Chooses the codec based on the field name prefix - which is fixed/pre-decided and not designed to be
   overridden."
   []
-  (let [comp-postings-format (Completion50PostingsFormat.)]
-    (proxy [Lucene80Codec] []
+  (let [comp-postings-format (Completion84PostingsFormat.)]
+    (proxy [Lucene84Codec] []
       (getPostingsFormatForField [field-name]
         (if (.startsWith field-name d/suggest-field-prefix)
           comp-postings-format
