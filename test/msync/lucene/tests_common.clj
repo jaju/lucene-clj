@@ -1,8 +1,8 @@
 ;; [[file:~/github/lucene-clj/README.org::*Given][Given:1]]
 (ns msync.lucene.tests-common
   (:require [msync.lucene
-             [analyzers :as analyzers]]
-            [msync.lucene.utils :as utils]
+             [analyzers :as analyzers]
+             [utils :as utils]]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [clojure.string :as s]))

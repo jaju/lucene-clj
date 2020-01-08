@@ -1,6 +1,5 @@
 (ns msync.lucene
-  (:require [clojure.java.io :as io]
-            [msync.lucene
+  (:require [msync.lucene
              [input-iterator]
              [document :as d]
              [query :as query]
@@ -125,7 +124,7 @@
 
 (defn create-infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
                                                                              :or   {suggester-class :infix}}]
-  (let [index     (store/store path :re-create? true)
+  (let [index     (store/create-store path :re-create? true)
         suggester (case suggester-class
                     :infix (AnalyzingInfixSuggester. index analyzer)
                     :blended-infix (BlendedInfixSuggester. index analyzer))]
@@ -135,13 +134,14 @@
 (defn lookup
   "lookup - because using suggest feels wrong after looking at the underlying implementation,
   which uses lookup."
-  [^Lookup suggester prefix & {:keys [^Set contexts
-                                      ^int max-results
-                                      result-xformer
-                                      ^boolean match-all?]
-                               :or   {result-xformer identity
-                                      match-all?     false
-                                      max-results    10}}]
+  [^Lookup suggester prefix
+   & {:keys [^Set contexts
+             ^int max-results
+             result-xformer
+             ^boolean match-all?]
+      :or   {result-xformer identity
+             match-all?     false
+             max-results    10}}]
   (let [results (if contexts
                   (.lookup suggester prefix contexts match-all? max-results)
                   (.lookup suggester prefix max-results match-all? false))]

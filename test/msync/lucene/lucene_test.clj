@@ -13,8 +13,8 @@
 (defonce suggestion-context-fields [:real])
 (defn context-fn [doc-map]
   (->> (select-keys doc-map suggestion-context-fields)
-    vals
-    (map string/lower-case)))
+       vals
+       (map string/lower-case)))
 
 (comment (let [data           sample-data
                fields         #{:first-name :last-name :age :real :gender :bio}
@@ -22,23 +22,23 @@
                keyword-fields #{:age}
                store          (lucene/store :memory :analyzer analyzer)
                _              (lucene/index! store data
-                                {:fields         fields
-                                 :suggest-fields suggest-fields
-                                 :context-fn     context-fn
-                                 :stored-fields  fields
-                                 :keyword-fields keyword-fields})]))
+                                             {:fields         fields
+                                              :suggest-fields suggest-fields
+                                              :context-fn     context-fn
+                                              :stored-fields  fields
+                                              :keyword-fields keyword-fields})]))
 
 (let [data           sample-data
       fields         #{:first-name :last-name :age :real :gender :bio}
       suggest-fields {:first-name 1}
       keyword-fields #{:age}
-      store          (store/store :memory :analyzer analyzer)
+      store          (store/create-store :memory :analyzer analyzer)
       _              (lucene/index! store data
-                       {:fields         fields
-                        :suggest-fields suggest-fields
-                        :context-fn     context-fn
-                        :stored-fields  fields
-                        :keyword-fields keyword-fields})
+                                    {:fields         fields
+                                     :suggest-fields suggest-fields
+                                     :context-fn     context-fn
+                                     :stored-fields  fields
+                                     :keyword-fields keyword-fields})
       directory      (:directory store)]
 
   ;; This is to hold onto the index when created during REPL-driven development, and this buffer is eval'ed.
@@ -99,7 +99,7 @@
   (deftest parse-query-dsl
     (testing "Given a classic query string"
       (is (= "name:shikari name:shambhu (real:true)^2.0"
-            (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (a/standard-analyzer [])))))))
+             (str (query/parse-dsl "Shikari Shambhu real:true^2" "name" (a/standard-analyzer [])))))))
 
   (deftest search-with-query-dsl
     (testing "Search for the Shikari using the classic query DSL"

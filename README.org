@@ -47,7 +47,7 @@ Note: There's sample data in the repository that we use in our examples. A hand-
 
 *** Given
 
-Following is code to demonstrate how text can be prepared to be fed into Lucene for indexing. We use two CSV files as our source of /documents/, but the sources could very well be anything, as long as they are converted into maps before being indexed by /lucene-clj/.
+Following is code to demonstrate how text can be prepared to be fed into Lucene for indexing. We use two CSV files as our source of /documents/, but the sources could very well be anything, as long as they are converted into Clojure maps before being indexed by /lucene-clj/.
 
 A note on the datasets.
 - The albums dataset
@@ -60,8 +60,8 @@ Below, we consume the files from the resources classpath as set up for this proj
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   (ns msync.lucene.tests-common
     (:require [msync.lucene
-               [analyzers :as analyzers]]
-              [msync.lucene.utils :as utils]
+               [analyzers :as analyzers]
+               [utils :as utils]]
               [clojure.data.csv :as csv]
               [clojure.java.io :as io]
               [clojure.string :as s]))
@@ -70,23 +70,27 @@ Below, we consume the files from the resources classpath as set up for this proj
     (assoc coll column
            (map s/trim (s/split (get coll column) #","))))
 
+  (defn read-csv-resource-file [filename]
+    (-> filename
+        io/resource
+        slurp
+        csv/read-csv))
+
+(defonce sample-data-file "sample-data.csv")
+  (defonce sample-data (-> sample-data-file
+                           read-csv-resource-file
+                           utils/docs:vecs->maps))
+
   (defn process-album-data-row [row]
     (-> row
         (process-csv-column :Genre)
         (process-csv-column :Subgenre)))
 
-  (defonce sample-data (-> "sample-data.csv"
-                           io/resource
-                           slurp
-                           csv/read-csv
-                           utils/docs:vecs->maps))
-
-  (def album-data (->> "albumlist.csv"
-                           io/resource
-                           slurp
-                           csv/read-csv
-                           utils/docs:vecs->maps
-                           (map process-album-data-row)))
+(defonce albums-file "albumlist.csv")
+  (def album-data (->> albums-file
+                       read-csv-resource-file
+                       utils/docs:vecs->maps
+                       (map process-album-data-row)))
 
   (defonce default-analyzer (analyzers/standard-analyzer))
   (defonce keyword-analyzer (analyzers/keyword-analyzer))
@@ -99,8 +103,26 @@ Below, we consume the files from the resources classpath as set up for this proj
                                    :Subgenre keyword-analyzer}))
 #+END_SRC
 
+Here are a few lines from the data files
 
-***  Some simple REPL-runs
+**** Sample, hand-coded data
+#+BEGIN_SRC clojure :results value table
+(take 5 (read-csv-resource-file sample-data-file))
+#+END_SRC
+
+#+RESULTS:
+| first-name | last-name   | age | real  | gender | bio                                                                                                                                                          |
+| Suppandi   | Varadarajan |  16 | false | m      | A wonderful, innocent soul. You'll enjoy his antics.                                                                                                         |
+| Shikari    | Shambhu     |  32 | False | m      | Carries a gun. But no bullets. Animals love him.                                                                                                             |
+| Chacha     | Chaudhary   |  64 | FalSe | m      | The supercomputer. And then some more!                                                                                                                       |
+| Sabu       | Jupiterwala |   2 | false | m      | Yes, of legal age. Just a different age-scale because of the planet he comes from. Strong, powerful, but kind. Because, not an earthling. Children love him. |
+
+**** Albums data
+#+BEGIN_SRC clojure :results value table
+(take 5 (read-csv-resource-file albums-file))
+#+END_SRC
+
+*** Some simple REPL-runs
 
 As you may expect, this is for your REPLeasure. I've used the /dev/ namespace, which can be found [[file:dev/dev.clj][here]].
 
@@ -126,12 +148,12 @@ As you may expect, this is for your REPLeasure. I've used the /dev/ namespace, w
 **** Create an index
 In memory
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (def index (store/store :memory :analyzer album-data-analyzer))
+  (def index (store/create-store :memory :analyzer album-data-analyzer))
 #+END_SRC
 
 Or, on disk
 #+BEGIN_SRC clojure :tangle no :results none
-  (def index (store/store "/path/to/index/directory" :analyzer album-data-analyzer))
+  (def index (store/create-store "/path/to/index/directory" :analyzer album-data-analyzer))
 #+END_SRC
 
 Sample album data for reference. The /genre/ and /subgenre/ columns are pre-processed, as mentioned above, and split further.
@@ -233,9 +255,10 @@ For convenience, /lucene-clj/ has a function that can be used to convert the Luc
 Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as collections. The /document->map/ function isn't smart to identify that, and needs a hint to make that happen.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-    (lucene/search index {:Year "1979"}
-                   {:results-per-page 2
-                    :hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])})
+  (lucene/search index
+                 {:Year "1979"}
+                 {:results-per-page 2
+                  :hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])})
 #+END_SRC
 
 #+RESULTS:

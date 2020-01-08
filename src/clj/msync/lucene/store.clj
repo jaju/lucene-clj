@@ -48,12 +48,12 @@
   (.deleteAll iw))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn- new-store [directory analyzer
-                  & {:keys []
-                     :as   opts}]
+(defn- -create-store [directory analyzer
+                      & {:keys []
+                         :as   opts}]
   (->Store directory analyzer (atom (or opts {}))))
 
-(defn- ^Directory memory-index
+(defn- ^Directory create-memory-index
   "Lucene Directory for transient indexes"
   []
   (let [temp-path (utils/temp-path)
@@ -61,7 +61,7 @@
     (utils/delete-on-exit! d)
     d))
 
-(defn- ^Directory disk-index
+(defn- ^Directory create-disk-index
   "Persistent index on disk"
   [^String dir-path {:keys [re-create?] :or {re-create? false}}]
   (let [path (.toPath ^File (io/as-file dir-path))
@@ -70,13 +70,12 @@
       (delete-all! dir))
     dir))
 
-(defn ^Store store
+(defn ^Store create-store
   "Create an appropriate index - where path is either the keyword :memory, or
   a string representing the path on disk where the index is created."
   [path & {:keys [analyzer]
            :as   opts}]
   (let [index (if (= path :memory)
-                (memory-index)
-                (disk-index path opts))]
-    (new-store index analyzer)))
-
+                (create-memory-index)
+                (create-disk-index path opts))]
+    (-create-store index analyzer)))
