@@ -106,7 +106,7 @@ Below, we consume the files from the resources classpath as set up for this proj
 Here are a few lines from the data files
 
 **** Sample, hand-coded data
-#+BEGIN_SRC clojure :results value table
+#+BEGIN_SRC clojure :results value table :exports both
 (take 5 (read-csv-resource-file sample-data-file))
 #+END_SRC
 
@@ -118,9 +118,16 @@ Here are a few lines from the data files
 | Sabu       | Jupiterwala |   2 | false | m      | Yes, of legal age. Just a different age-scale because of the planet he comes from. Strong, powerful, but kind. Because, not an earthling. Children love him. |
 
 **** Albums data
-#+BEGIN_SRC clojure :results value table
+#+BEGIN_SRC clojure :results value table :exports both
 (take 5 (read-csv-resource-file albums-file))
 #+END_SRC
+
+#+RESULTS:
+| Number | Year | Album                                 | Artist         | Genre | Subgenre                      |
+|      1 | 1967 | Sgt. Pepper's Lonely Hearts Club Band | The Beatles    | Rock  | Rock & Roll, Psychedelic Rock |
+|      2 | 1966 | Pet Sounds                            | The Beach Boys | Rock  | Pop Rock, Psychedelic Rock    |
+|      3 | 1966 | Revolver                              | The Beatles    | Rock  | Psychedelic Rock, Pop Rock    |
+|      4 | 1965 | Highway 61 Revisited                  | Bob Dylan      | Rock  | Folk Rock, Blues Rock         |
 
 *** Some simple REPL-runs
 
