@@ -92,7 +92,7 @@
 (defn- field->kv [^Field f]
   [(-> f .name keyword) (.stringValue f)])
 
-(defn- update-conj [m k v]
+(defn- assoc-conj [m k v]
   (assoc m k (conj (m k []) v)))
 
 (defn document->map
@@ -110,7 +110,7 @@
         (let [[k v] (field->kv field)]
           (if (fields-to-keep k)
             (if (multi-fields k)
-              (update-conj m k v)
+              (assoc-conj m k v)
               (assoc m k v))
             m)))
       {}

@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [msync.lucene.tests-common :refer :all]
             [msync.lucene :as lucene]
-            [msync.lucene.store :as store]
+            [msync.lucene.index :as store]
             [clojure.string :as string]
             [msync.lucene.query :as query]
             [msync.lucene.analyzers :as a]
@@ -32,7 +32,7 @@
       fields         #{:first-name :last-name :age :real :gender :bio}
       suggest-fields {:first-name 1}
       keyword-fields #{:age}
-      store          (store/create-store :memory :analyzer analyzer)
+      store          (store/create! :type :memory :analyzer analyzer)
       _              (lucene/index! store data
                                     {:fields         fields
                                      :suggest-fields suggest-fields

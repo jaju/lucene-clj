@@ -2,13 +2,13 @@
 (ns dev
   (:require [msync.lucene :as lucene]
             [msync.lucene
-             [store :as store]
+             [index :as index]
              [document :as ld]
              [tests-common :refer :all]]))
 ;; Preamble:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Create an index][Create an index:1]]
-(def index (store/create-store :memory :analyzer album-data-analyzer))
+(defonce index (index/create! :type :memory :analyzer album-data-analyzer))
 ;; Create an index:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Index documents - which are Clojure maps][Index documents - which are Clojure maps:1]]
@@ -24,8 +24,8 @@
 ;; Now, we can search:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Now, we can search][Now, we can search:3]]
-(clojure.pprint/pprint (do (lucene/search index {:Year "1979"}
-               {:results-per-page 2
+(clojure.pprint/pprint (do (lucene/search index {:Year "1977"}
+               {:results-per-page 3
                 :hit->doc ld/document->map})))
 ;; Now, we can search:3 ends here
 

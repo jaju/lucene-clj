@@ -1,22 +1,14 @@
-(ns msync.lucene.store
+(ns msync.lucene.index
   (:require [clojure.java.io :as io]
-            [msync.lucene.utils :as utils]
-            [msync.lucene.suggestions :as su])
+            [msync.lucene
+             [utils :as utils]
+             [suggestions :as su]])
   (:import [org.apache.lucene.index IndexWriter DirectoryReader IndexReader IndexWriterConfig]
            [org.apache.lucene.store FSDirectory Directory MMapDirectory]
            [java.io File]
            [org.apache.lucene.analysis Analyzer]))
 
-(defprotocol StoreConfig
-  (directory [_])
-  (analyzer [_])
-  (set! [_ k v]))
-
-(defrecord ^:private Store [directory analyzer opts]
-  StoreConfig
-  (directory [_] directory)
-  (analyzer [_] analyzer)
-  (set! [_ k v] (swap! opts assoc k v)))
+(defrecord ^:private IndexConfig [directory analyzer])
 
 (defn index-writer-config
   "IndexWriterConfig instance."
@@ -38,9 +30,9 @@
 
 (defmulti delete-all! class)
 
-(defmethod delete-all! Store
-  [^Store store]
-  (with-open [iw (index-writer (:directory store) (index-writer-config (:analyzer store)))]
+(defmethod delete-all! IndexConfig
+  [^IndexConfig {:keys [directory analyzer]}]
+  (with-open [iw (index-writer directory (index-writer-config analyzer))]
     (delete-all! iw)))
 
 (defmethod delete-all! IndexWriter
@@ -48,12 +40,10 @@
   (.deleteAll iw))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-(defn- -create-store [directory analyzer
-                      & {:keys []
-                         :as   opts}]
-  (->Store directory analyzer (atom (or opts {}))))
+(defn- new-index-config [directory analyzer]
+  (->IndexConfig directory analyzer))
 
-(defn- ^Directory create-memory-index
+(defn- ^Directory create-mmap-directory
   "Lucene Directory for transient indexes"
   []
   (let [temp-path (utils/temp-path)
@@ -61,21 +51,21 @@
     (utils/delete-on-exit! d)
     d))
 
-(defn- ^Directory create-disk-index
+(defn- ^Directory create-disk-directory
   "Persistent index on disk"
-  [^String dir-path {:keys [re-create?] :or {re-create? false}}]
+  [^String dir-path re-create?]
   (let [path (.toPath ^File (io/as-file dir-path))
         dir  (FSDirectory/open path)]
     (when re-create?
       (delete-all! dir))
     dir))
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-(defn ^Store create-store
+(defn ^IndexConfig create!
   "Create an appropriate index - where path is either the keyword :memory, or
   a string representing the path on disk where the index is created."
-  [path & {:keys [analyzer]
-           :as   opts}]
-  (let [index (if (= path :memory)
-                (create-memory-index)
-                (create-disk-index path opts))]
-    (-create-store index analyzer)))
+  [& {:keys [type path analyzer re-create?]}]
+  (let [index (condp = type
+                :memory (create-mmap-directory)
+                :disk (create-disk-directory path (or re-create? false)))]
+    (new-index-config index analyzer)))

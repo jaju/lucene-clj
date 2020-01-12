@@ -4,7 +4,7 @@
              [document :as d]
              [query :as query]
              [suggestions :as su]
-             [store :as store]
+             [index :as index]
              [analyzers :as a]])
   (:import [java.util Set]
            [java.util.logging Logger]
@@ -14,7 +14,7 @@
                                      BooleanQuery$Builder BooleanClause$Occur]
            [org.apache.lucene.search.suggest.analyzing AnalyzingInfixSuggester BlendedInfixSuggester]
            [org.apache.lucene.search.suggest InputIterator Lookup]
-           [msync.lucene.store Store]))
+           [msync.lucene.index IndexConfig]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defonce logger (Logger/getLogger "msync.lucene"))
@@ -23,12 +23,12 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defmulti index! (fn [o & _] (class o)))
 
-(defmethod index! Store
-  [^Store store doc-maps opts]
+(defmethod index! IndexConfig
+  [^IndexConfig store doc-maps opts]
   (let [analyzer  (:analyzer store)
         directory (:directory store)
-        iwc       (store/index-writer-config analyzer)]
-    (with-open [iw (store/index-writer directory iwc)]
+        iwc       (index/index-writer-config analyzer)]
+    (with-open [iw (index/index-writer directory iwc)]
       (index! iw doc-maps (dissoc opts :analyzer)))))
 
 (defmethod index! IndexWriter
@@ -54,7 +54,7 @@
 
 (defmethod search* Directory
   [^Directory index-store query-form opts]
-  (with-open [reader (store/index-reader index-store)]
+  (with-open [reader (index/index-reader index-store)]
     (search* reader query-form opts)))
 
 (defmethod search* IndexReader
@@ -82,9 +82,9 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn search
-  ([^Store store query-form]
+  ([^IndexConfig store query-form]
    (search store query-form {}))
-  ([^Store store query-form opts]
+  ([^IndexConfig store query-form opts]
    (let [{:keys [directory analyzer]} store]
      (search* directory query-form (assoc opts :analyzer analyzer)))))
 
@@ -95,14 +95,14 @@
         infrastructure."
           #(class (first %&)))
 
-(defmethod suggest Store
+(defmethod suggest IndexConfig
 
   ([store field-name prefix-query]
    (suggest store field-name prefix-query {}))
 
   ([store field-name prefix-query opts]
    (let [{:keys [directory analyzer]} store]
-     (with-open [index-reader (store/index-reader directory)]
+     (with-open [index-reader (index/index-reader directory)]
        (suggest index-reader field-name prefix-query (assoc opts :analyzer analyzer))))))
 
 (defmethod suggest IndexReader
@@ -124,7 +124,7 @@
 
 (defn create-infix-suggester-index [path ^InputIterator doc-maps-iterator & {:keys [analyzer suggester-class]
                                                                              :or   {suggester-class :infix}}]
-  (let [index     (store/create-store path :re-create? true)
+  (let [index     (index/create! path :re-create? true)
         suggester (case suggester-class
                     :infix (AnalyzingInfixSuggester. index analyzer)
                     :blended-infix (BlendedInfixSuggester. index analyzer))]
@@ -132,8 +132,6 @@
     suggester))
 
 (defn lookup
-  "lookup - because using suggest feels wrong after looking at the underlying implementation,
-  which uses lookup."
   [^Lookup suggester prefix
    & {:keys [^Set contexts
              ^int max-results
