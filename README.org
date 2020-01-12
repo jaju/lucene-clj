@@ -216,16 +216,19 @@ I've used the /dev/ namespace below, the code for which can be found [[file:dev/
 *** Create an index
 In memory
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (defonce index (index/create! :type :memory :analyzer album-data-analyzer))
+  (defonce index (index/create! :type :memory
+                                :analyzer album-data-analyzer))
 #+END_SRC
 
 Or, on disk
 #+BEGIN_SRC clojure :tangle no :results none
-  (def index (store/create-store "/path/to/index/directory" :analyzer album-data-analyzer))
+  (defonce index (index/create! :type :disk
+                            :path "/path/to/index/directory"
+                            :analyzer album-data-analyzer))
 #+END_SRC
 
 A sample of the album data for reference.
-The /genre/ and /subgenre/ columns are pre-processed, as mentioned above, and split further.
+The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and split further.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
 (take 3 album-data)
 #+END_SRC

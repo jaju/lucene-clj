@@ -8,7 +8,8 @@
 ;; Preamble:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Create an index][Create an index:1]]
-(defonce index (index/create! :type :memory :analyzer album-data-analyzer))
+(defonce index (index/create! :type :memory
+                              :analyzer album-data-analyzer))
 ;; Create an index:1 ends here
 
 ;; [[file:~/github/lucene-clj/README.org::*Index documents - which are Clojure maps][Index documents - which are Clojure maps:1]]
