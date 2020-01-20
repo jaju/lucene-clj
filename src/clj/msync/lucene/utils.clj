@@ -5,7 +5,7 @@
            [java.nio.file.attribute FileAttribute]
            [org.apache.lucene.store FSDirectory]))
 
-(def !nil? (comp nil? not))
+(def !nil? (comp not nil?))
 
 (defn- lucene-dir-deleter [^FSDirectory directory]
   (doseq [^String f (.listAll directory)]

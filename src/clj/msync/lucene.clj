@@ -25,8 +25,8 @@
      (search/search directory query-form (assoc opts :analyzer analyzer)))))
 
 (defn suggest
-  ([index field-name ^String prefix-query]
-   (suggestions/suggest index field-name prefix-query))
-  ([index field-name ^String prefix-query opts]
-   (suggestions/suggest index field-name prefix-query opts)))
+  ([^IndexConfig index-config field-name ^String prefix-query]
+   (suggestions/suggest index-config field-name prefix-query))
+  ([^IndexConfig index-config field-name ^String prefix-query opts]
+   (suggestions/suggest index-config field-name prefix-query opts)))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
