@@ -10,7 +10,7 @@
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
 (defprotocol QueryExpression
-  (parse [expr opts]))
+  (parse [expr] [expr opts]))
 
 (defn- query-subexp-meta-process
   "If the sub-expression is a map-entry, pick the field-name from the key.
@@ -34,6 +34,7 @@
 (extend-protocol QueryExpression
 
   Query
+  (parse [query] query)
   (parse [query _] query)
 
   Sequential
@@ -64,8 +65,18 @@
    (parse-dsl dsl "" analyzer))
   ([^String dsl ^String default-field-name ^Analyzer analyzer]
    (let [default-field-name (name default-field-name)
-         ^QueryParser qp    (QueryParser. default-field-name analyzer)]
+         ^QueryParser qp   (QueryParser. default-field-name analyzer)]
      (doto qp
        (.setSplitOnWhitespace true)
        (.setAutoGeneratePhraseQueries true))
      (.parse qp dsl))))
+
+(defn create-fuzzy-query [fld ^String val]
+  (let [term (Term. ^String (name fld) val)]
+    (FuzzyQuery. term)))
+
+(defn combine-fuzzy-queries [m]
+  (let [b (BooleanQuery$Builder.)]
+    (doseq [[k v] m]
+      (.add b (create-fuzzy-query k v) BooleanClause$Occur/SHOULD))
+    (.build b)))

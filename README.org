@@ -52,7 +52,7 @@ I am thankful to the above library authors for their liberal licensing. I've use
 
 Note: There's sample data in the repository that we use in our examples. A hand-created sample with fictional and non-fictional characters is [[file:test-resources/sample-data.csv][here]] and one from Kaggle on music albums is [[file:test-resources/albumlist.csv][here]]. These are also used in the tests.
 
-** TODO Given
+** Given
 
 Following is code to demonstrate how text can be prepared to be fed into Lucene for indexing. 
 We use two CSV datasets as our sources of /documents/ to create two indexes, to demonstrate some
@@ -75,15 +75,15 @@ Below, we consume the files from the resources classpath as set up for this proj
 Java's IO facilities, and then perform CSV to map conversion for each row.
 
 Here's an example of how you'd prepare your data for consumption by the indexer. Key terms to note are
-- Document :: Every unit of related text. It has possibly many fields, and is a unit of consumption and also of each search result.
-- Fields :: Every field is a container of indexable content. They can range across many types, from simple text to /latitude/ and /longitude/.
+- Document :: Every unit of related text. It has possibly many fields, and is a unit of consumption and also of each search result. A ~Document~ is a collection of ~Fields~.
+- Field :: Every field is a container of indexable content. They can range across many types, from simple text to /latitude/ and /longitude/.
 - Analyzer :: Analyzes the input documents, and preprocesses terms appropriately. Depending on the context, decisions on tokenizing, stemming, stopwords removal, or treating input as-is - these are controlled by the use of appropriate analyzers
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   (ns msync.lucene.tests-common
     (:require [msync.lucene
                [analyzers :as analyzers]
-               [utils :as utils]]
+               [document :as ld]]
               [clojure.data.csv :as csv]
               [clojure.java.io :as io]
               [clojure.string :as s]))
@@ -144,7 +144,7 @@ them further before they go for indexing.
   ;; Simple sample data - straightforward splits of columns
   (defonce sample-data (-> sample-data-file
                            read-csv-resource-file
-                           utils/docs:vecs->maps))
+                           ld/vecs->maps))
 
   ;; Album data - handler for multi-valued columns,
   ;; which happen to be comma-separated themselves.
@@ -161,7 +161,7 @@ them further before they go for indexing.
 
   (defonce album-data (->> albums-file
                            read-csv-resource-file
-                           utils/docs:vecs->maps
+                           ld/vecs->maps
                            (map process-album-data-row)))
 
 #+END_SRC
@@ -201,7 +201,6 @@ I've used the /dev/ namespace below, the code for which can be found [[file:dev/
   (ns dev
     (:require [msync.lucene :as lucene]
               [msync.lucene
-               [index :as index]
                [document :as ld]
                [tests-common :refer :all]]))
 #+END_SRC
@@ -216,13 +215,13 @@ I've used the /dev/ namespace below, the code for which can be found [[file:dev/
 *** Create an index
 In memory
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (defonce index (index/create! :type :memory
+  (defonce index (lucene/create-index! :type :memory
                                 :analyzer album-data-analyzer))
 #+END_SRC
 
 Or, on disk
 #+BEGIN_SRC clojure :tangle no :results none
-  (defonce index (index/create! :type :disk
+  (defonce index (lucene/create-index! :type :disk
                             :path "/path/to/index/directory"
                             :analyzer album-data-analyzer))
 #+END_SRC
@@ -368,13 +367,13 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
 
 Paginated query results are supported via the /:page/ option. Also, the following example projects a subset of the document fields by passing a modified function as the /:hit->doc/ argument.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-    (lucene/search index 
-                   {:Year "1968"} ;; Map of field-values to search with
-                   {:results-per-page 5 ;; Control the number of results returned
-                    :page 4             ;; Page number, starting 0 as default
-                    :hit->doc         #(-> %
-                                           ld/document->map
-                                           (select-keys [:Year :Album]))})
+  (lucene/search index 
+                 {:Year "1968"} ;; Map of field-values to search with
+                 {:results-per-page 5 ;; Control the number of results returned
+                  :page 4             ;; Page number, starting 0 as default
+                  :hit->doc         #(-> %
+                                         ld/document->map
+                                         (select-keys [:Year :Album]))})
 #+END_SRC
 
 #+RESULTS:
@@ -390,7 +389,7 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 - Simple search
 Searching in a single field, for a single value
 #+BEGIN_SRC clojure :tangle no :results no
-(lucene/search index {:Year "1967"})
+  (lucene/search index {:Year "1967"})
 #+END_SRC
 
 - OR Search
@@ -402,17 +401,17 @@ Searching in a single field, where _any_ of the values in the /set/ are allowed
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 [{:hit {:Year "1964", :Album "Meet The Beatles!"},
-  :score 2.1420584,
+  :score 2.1675856,
   :doc-id 52}
  {:hit {:Year "1964", :Album "Folk Singer"},
-  :score 2.1420584,
+  :score 2.1675856,
   :doc-id 281}
  {:hit {:Year "1964", :Album "A Hard Day's Night"},
-  :score 2.1420584,
+  :score 2.1675856,
   :doc-id 306}]
-#+END_SRC
+#+end_src
 
 - AND Search
 When looking for multiple terms in a single field, pass a /vector/.
@@ -421,7 +420,7 @@ When looking for multiple terms in a single field, pass a /vector/.
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 [{:hit
   {:Number "254",
    :Year "1966",
@@ -430,9 +429,19 @@ When looking for multiple terms in a single field, pass a /vector/.
    :Artist "Otis Redding",
    :Genre "Funk / Soul",
    :Subgenre "Soul"},
-  :score 3.057108,
-  :doc-id 253}]
-#+END_SRC
+  :score 3.1357086,
+  :doc-id 253}
+ {:hit
+  {:Number "254",
+   :Year "1966",
+   :Album
+   "Complete & Unbelievable: The Otis Redding Dictionary of Soul",
+   :Artist "Otis Redding",
+   :Genre "Funk / Soul",
+   :Subgenre "Soul"},
+  :score 3.1357086,
+  :doc-id 753}]
+#+end_src
 
 Be sure that your queries are semantically right for the dataset. For example, /AND/-ing over two different years will lead to an empty result-set, obviously.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
@@ -440,9 +449,9 @@ Be sure that your queries are semantically right for the dataset. For example, /
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 []
-#+END_SRC
+#+end_src
 
 - Phrase search
 Spaces in the query string are inferred to mean a phrase search operation
@@ -451,7 +460,7 @@ Spaces in the query string are inferred to mean a phrase search operation
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 [{:hit
   {:Number "11",
    :Year "1976",
@@ -459,8 +468,17 @@ Spaces in the query string are inferred to mean a phrase search operation
    :Artist "Elvis Presley",
    :Genre "Rock",
    :Subgenre "Rock & Roll"},
-  :score 2.8861985,
+  :score 2.9202006,
   :doc-id 10}
+ {:hit
+  {:Number "11",
+   :Year "1976",
+   :Album "The Sun Sessions",
+   :Artist "Elvis Presley",
+   :Genre "Rock",
+   :Subgenre "Rock & Roll"},
+  :score 2.9202006,
+  :doc-id 510}
  {:hit
   {:Number "288",
    :Year "1968",
@@ -468,18 +486,36 @@ Spaces in the query string are inferred to mean a phrase search operation
    :Artist "Grateful Dead",
    :Genre "Rock",
    :Subgenre "Psychedelic Rock"},
-  :score 2.544825,
+  :score 2.5748055,
   :doc-id 287}
  {:hit
   {:Number "311",
    :Year "1994",
    :Album "The Sun Records Collection",
    :Artist "Various",
-   :Genre "Rock, Funk / Soul, Blues, Pop, Folk, World, & Country",
-   :Subgenre "Country Blues, Rock & Roll, Rockabilly"},
-  :score 2.544825,
-  :doc-id 310}]
-#+END_SRC
+   :Genre "& Country",
+   :Subgenre "Rockabilly"},
+  :score 2.5748055,
+  :doc-id 310}
+ {:hit
+  {:Number "288",
+   :Year "1968",
+   :Album "Anthem of the Sun",
+   :Artist "Grateful Dead",
+   :Genre "Rock",
+   :Subgenre "Psychedelic Rock"},
+  :score 2.5748055,
+  :doc-id 787}
+ {:hit
+  {:Number "311",
+   :Year "1994",
+   :Album "The Sun Records Collection",
+   :Artist "Various",
+   :Genre "& Country",
+   :Subgenre "Rockabilly"},
+  :score 2.5748055,
+  :doc-id 810}]
+#+end_src
 
 - Searching across fields
 
@@ -490,7 +526,7 @@ This is an /AND/ operation
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 [{:hit
   {:Number "11",
    :Year "1976",
@@ -498,17 +534,26 @@ This is an /AND/ operation
    :Artist "Elvis Presley",
    :Genre "Rock",
    :Subgenre "Rock & Roll"},
-  :score 4.56387,
-  :doc-id 10}]
-#+END_SRC
+  :score 4.606601,
+  :doc-id 10}
+ {:hit
+  {:Number "11",
+   :Year "1976",
+   :Album "The Sun Sessions",
+   :Artist "Elvis Presley",
+   :Genre "Rock",
+   :Subgenre "Rock & Roll"},
+  :score 4.606601,
+  :doc-id 510}]
+#+end_src
 
 
 ** Suggestions
 
 Notice that in the /suggest/ function call, the field and suggestion-prefix are *not* passed as a map, as unlike search, suggest calls are only supported over a single field.
 
-**** Suggestions support for fields passed via /:suggest-fields/
-From above, the fields `Album` and `Artist` have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
+**** Suggestions support for fields passed via ~:suggest-fields~
+From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
   (lucene/suggest index :Album "par"

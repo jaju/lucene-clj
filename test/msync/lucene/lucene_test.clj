@@ -2,7 +2,7 @@
   (:require [clojure.test :refer :all]
             [msync.lucene.tests-common :refer :all]
             [msync.lucene :as lucene]
-            [msync.lucene.index :as store]
+            [msync.lucene.indexer :as indexer]
             [clojure.string :as string]
             [msync.lucene.query :as query]
             [msync.lucene.analyzers :as a]
@@ -16,23 +16,12 @@
        vals
        (map string/lower-case)))
 
-(comment (let [data           sample-data
-               fields         #{:first-name :last-name :age :real :gender :bio}
-               suggest-fields {:first-name 1}
-               keyword-fields #{:age}
-               store          (lucene/store :memory :analyzer analyzer)
-               _              (lucene/index! store data
-                                             {:fields         fields
-                                              :suggest-fields suggest-fields
-                                              :context-fn     context-fn
-                                              :stored-fields  fields
-                                              :keyword-fields keyword-fields})]))
 
 (let [data           sample-data
       fields         #{:first-name :last-name :age :real :gender :bio}
       suggest-fields {:first-name 1}
       keyword-fields #{:age}
-      store          (store/create! :type :memory :analyzer analyzer)
+      store          (lucene/create-index! :type :memory :analyzer analyzer)
       _              (lucene/index! store data
                                     {:fields         fields
                                      :suggest-fields suggest-fields

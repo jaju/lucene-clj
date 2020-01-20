@@ -2,7 +2,7 @@
 (ns msync.lucene.tests-common
   (:require [msync.lucene
              [analyzers :as analyzers]
-             [utils :as utils]]
+             [document :as ld]]
             [clojure.data.csv :as csv]
             [clojure.java.io :as io]
             [clojure.string :as s]))
@@ -26,7 +26,7 @@
 ;; Simple sample data - straightforward splits of columns
 (defonce sample-data (-> sample-data-file
                          read-csv-resource-file
-                         utils/docs:vecs->maps))
+                         ld/vecs->maps))
 
 ;; Album data - handler for multi-valued columns,
 ;; which happen to be comma-separated themselves.
@@ -43,7 +43,7 @@
 
 (defonce album-data (->> albums-file
                          read-csv-resource-file
-                         utils/docs:vecs->maps
+                         ld/vecs->maps
                          (map process-album-data-row)))
 ;; Given:5 ends here
 
