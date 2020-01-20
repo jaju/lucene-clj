@@ -1,4 +1,4 @@
-;; [[file:~/github/lucene-clj/README.org::*Given][Given:2]]
+;; [[file:~/github/lucene-clj/README.org::*Some Background - Data Preparation][Some Background - Data Preparation:2]]
 (ns msync.lucene.tests-common
   (:require [msync.lucene
              [analyzers :as analyzers]
@@ -20,9 +20,7 @@
 ;; The two datasets
 (defonce sample-data-file "sample-data.csv")
 (defonce albums-file "albumlist.csv")
-;; Given:2 ends here
 
-;; [[file:~/github/lucene-clj/README.org::*Given][Given:5]]
 ;; Simple sample data - straightforward splits of columns
 (defonce sample-data (-> sample-data-file
                          read-csv-resource-file
@@ -40,14 +38,14 @@
       (process-csv-column :Genre)
       (process-csv-column :Subgenre)))
 
-
 (defonce album-data (->> albums-file
                          read-csv-resource-file
                          ld/vecs->maps
                          (map process-album-data-row)))
-;; Given:5 ends here
+;; Some Background - Data Preparation:2 ends here
 
-;; [[file:~/github/lucene-clj/README.org::*Given][Given:6]]
+;; [[file:~/github/lucene-clj/README.org::*Creating Analyzers][Creating Analyzers:1]]
+;; In the common namespace
 ;; This is the default analyzer, an instance of the StandardAnalyzer
 ;; of Lucene
 (defonce default-analyzer (analyzers/standard-analyzer))
@@ -63,4 +61,4 @@
                                 {:Year     keyword-analyzer
                                  :Genre    keyword-analyzer
                                  :Subgenre keyword-analyzer}))
-;; Given:6 ends here
+;; Creating Analyzers:1 ends here

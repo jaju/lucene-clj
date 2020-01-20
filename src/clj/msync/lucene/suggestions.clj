@@ -38,16 +38,11 @@
 
 (defn suggest
   "Return suggestions for prefix-queries."
-  ([^IndexConfig index-config field-name prefix-query]
-   (suggest index-config field-name prefix-query {}))
-
-  ([^IndexConfig index-config field-name prefix-query {:keys [max-results hit->doc fuzzy? skip-duplicates? contexts]}]
-   (let [{:keys [directory analyzer]} index-config
-         opts {:fuzzy?           (or fuzzy? false)
-               :skip-duplicates? (or skip-duplicates? false)
-               :max-results      (or max-results 10)
-               :hit->doc         (or hit->doc identity)
-               :contexts         contexts
-               :analyzer         analyzer}]
-     (with-open [index (indexer/index-reader directory)]
-       (suggest* index (name field-name) prefix-query opts)))))
+  [^IndexReader index-reader field-name prefix-query {:keys [max-results hit->doc fuzzy? skip-duplicates? contexts analyzer]}]
+  (let [opts {:fuzzy?           (or fuzzy? false)
+              :skip-duplicates? (or skip-duplicates? false)
+              :max-results      (or max-results 10)
+              :hit->doc         (or hit->doc identity)
+              :contexts         contexts
+              :analyzer         analyzer}]
+    (suggest* index-reader (name field-name) prefix-query opts)))

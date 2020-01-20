@@ -21,12 +21,15 @@
   ([^IndexConfig index-config query-form]
    (search index-config query-form {}))
   ([^IndexConfig index-config query-form opts]
-   (let [{:keys [directory analyzer]} index-config]
-     (search/search directory query-form (assoc opts :analyzer analyzer)))))
+   (let [{:keys [directory analyzer]} index-config
+         opts (assoc opts :analyzer analyzer)]
+     (with-open [reader (indexer/index-reader directory)]
+       (search/search reader query-form opts)))))
 
 (defn suggest
-  ([^IndexConfig index-config field-name ^String prefix-query]
-   (suggestions/suggest index-config field-name prefix-query))
-  ([^IndexConfig index-config field-name ^String prefix-query opts]
-   (suggestions/suggest index-config field-name prefix-query opts)))
+  [^IndexConfig index-config field-name ^String prefix-query & [opts]]
+  (let [{:keys [directory analyzer]} index-config
+        opts (assoc (or opts {}) :analyzer analyzer)]
+    (with-open [index-reader (indexer/index-reader directory)]
+      (suggestions/suggest index-reader (name field-name) prefix-query opts))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -8,7 +8,11 @@
 
 * What?
 
-A Clojure wrapper for Apache Lucene.
+A /straightforward/ and /low-noise/ Clojure wrapper for Apache Lucene.
+
+Key usage scenarios
+- Search :: The core use-case of Lucene.
+- Suggest :: Prefix-queries for content in any field.
 
 Both in-memory, and on-disk indexes can be used depending on the dataset size.
 
@@ -18,9 +22,6 @@ Inspired by other example wrappers I've come across.
 Notably
  - [[https://github.com/federkasten/clucie][Clucie]]
  - [[https://github.com/weavejester/clucy][Clucy]]
-
-** A note about *this* README.org. 
-The code here should always be valid, being written in the literate programming style and /org-tangled/ to the relevant files.
 
 
 * Dependency
@@ -32,13 +33,13 @@ Available via [[https://clojars.org/search?q=lucene-clj][clojars]].
 
 * Why?
 
-The primary use-case is for in-process text search needs for primarily read-only datasets that can be managed on single-instance deployments. Because for multi-instance deployments, keeping modifications of data in sync is an effort. In other words, when you need light-weight text-search support without the hassle of setting up something like Solr.
+The primary use-case is for in-process text search needs for read-only datasets that can be managed on single-instance deployments. Because for multi-instance deployments, keeping modifications of data in sync is an effort. In other words, when you need light-weight text-search support without the hassle of setting up something like Solr. You may update the index if you wish, but have to take care of any race conditions, and since it is in-process, you will also need to take care of updating all instances in a multi-instance use scenario.
 
-This is imagined as a light-weight library for cheaply creating search indexes for simple scenarios. Any updates to the index are suggested to be done via create-a-new-index-and-switch approach. The objectives are loosely as follows.
+The objectives are loosely as follows.
 
 - Stick to _core_ Lucene. No script/language specific dependencies part of the core language, but can be added by users per need.
 - Support for prefix based _suggestions_ - a feature of Lucene I found quite undocumented, as well as lacking good examples for.
-- Up-to-date with the latest Lucene as on date.
+- Track the latest Lucene versions.
 
 I am thankful to the above library authors for their liberal licensing. I've used their ideas/code in places.
 
@@ -48,19 +49,25 @@ I am thankful to the above library authors for their liberal licensing. I've use
 2. Hand-created, real + fictional characters [[file:test-resources/sample-data.csv][here]]
 
 
-* Usage
+* Usage - A Complete Scenario
 
-Note: There's sample data in the repository that we use in our examples. A hand-created sample with fictional and non-fictional characters is [[file:test-resources/sample-data.csv][here]] and one from Kaggle on music albums is [[file:test-resources/albumlist.csv][here]]. These are also used in the tests.
+There's sample data in the repository that we use in our examples. A hand-created sample with fictional and non-fictional characters is [[file:test-resources/sample-data.csv][here]] and one from Kaggle on music albums is [[file:test-resources/albumlist.csv][here]]. These are also used in the tests.
 
-** Given
+A complete scenario from index creation to search actions is described below.
 
-Following is code to demonstrate how text can be prepared to be fed into Lucene for indexing. 
-We use two CSV datasets as our sources of /documents/ to create two indexes, to demonstrate some
-distinct use-cases. The sources could very well be anything, as long as they are converted into
-Clojure maps before being indexed by /lucene-clj/.
+** Lucene's Document Model
 
-Lucene consumes /documents/, each of which is made up of /fields/ having values. As is natural
-in Clojure, we represent all such things (/virtually every domain entity!/) as -- maps.
+When dealing with Lucene and data it processes, key terms to note are
+- Document :: Every unit of related text. It has possibly many fields, and is a unit of consumption and also of each search result. A ~Document~ is a collection of ~Fields~.
+- Field :: Every field is a container of indexable content. They can range across many types, from simple text to /latitude/ and /longitude/.
+- Analyzer :: Analyzes the input documents, and preprocesses terms appropriately. Depending on the context, decisions on tokenizing, stemming, stopwords removal, or treating input as-is - these are controlled by the use of appropriate analyzers
+
+This is a pretty hand-wavy description, but useful enough for our purpose.
+
+
+** Some Background - Data Preparation
+
+Lucene consumes /documents/, each of which is made up of /fields/ having values. As is natural in Clojure, we represent all such things as /maps/.
 
 #+BEGIN_SRC clojure :results none
   {
@@ -71,15 +78,9 @@ in Clojure, we represent all such things (/virtually every domain entity!/) as -
    }
 #+END_SRC
 
-Below, we consume the files from the resources classpath as set up for this project using
-Java's IO facilities, and then perform CSV to map conversion for each row.
+To prepare our content for ingestion and indexing, we do some straightforward CSV parsing and conversion of each row into a map. Each column has a name and is used as the key for the field name in the document-map. All the preparation code is in the [[file:test/msync/lucene/tests_common.clj][msync.lucene.tests-common]] test namespace, which we'll refer to as the ~common~ namespace where required for clarity. We use two CSV datasets as our sources of /documents/ to create two indexes, to demonstrate some distinct use-cases. All data files are in the ~test-resources~ subdirectory.
 
-Here's an example of how you'd prepare your data for consumption by the indexer. Key terms to note are
-- Document :: Every unit of related text. It has possibly many fields, and is a unit of consumption and also of each search result. A ~Document~ is a collection of ~Fields~.
-- Field :: Every field is a container of indexable content. They can range across many types, from simple text to /latitude/ and /longitude/.
-- Analyzer :: Analyzes the input documents, and preprocesses terms appropriately. Depending on the context, decisions on tokenizing, stemming, stopwords removal, or treating input as-is - these are controlled by the use of appropriate analyzers
-
-#+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
+#+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :exports none :results none
   (ns msync.lucene.tests-common
     (:require [msync.lucene
                [analyzers :as analyzers]
@@ -101,46 +102,7 @@ Here's an example of how you'd prepare your data for consumption by the indexer.
   ;; The two datasets
   (defonce sample-data-file "sample-data.csv")
   (defonce albums-file "albumlist.csv")
-#+END_SRC
 
-
-Here are a few lines from the data files
-
-- Sample, hand-coded data. Plain, simple data.
-#+BEGIN_SRC clojure :results value table :exports both
-  (take 5 (read-csv-resource-file sample-data-file))
-#+END_SRC
-
-#+RESULTS:
-| first-name | last-name   | age | real  | gender | bio                                                                                                                                                          |
-| Suppandi   | Varadarajan |  16 | false | m      | A wonderful, innocent soul. You'll enjoy his antics.                                                                                                         |
-| Shikari    | Shambhu     |  32 | False | m      | Carries a gun. But no bullets. Animals love him.                                                                                                             |
-| Chacha     | Chaudhary   |  64 | FalSe | m      | The supercomputer. And then some more!                                                                                                                       |
-| Sabu       | Jupiterwala |   2 | false | m      | Yes, of legal age. Just a different age-scale because of the planet he comes from. Strong, powerful, but kind. Because, not an earthling. Children love him. |
-
-- Albums data
-  - The columns ~Genre~ and ~Subgenre~, are comma-separated values themselves
-    - They are to be pre-processed before feeding to /lucene-clj/
-    - These are multi-valued /fields/.
-  - The ~Year~, ~Genre~ and ~Subgenre~ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/.
-
-#+BEGIN_SRC clojure :results value table :exports both
-(take 5 (read-csv-resource-file albums-file))
-#+END_SRC
-
-#+RESULTS:
-| Number | Year | Album                                 | Artist         | Genre | Subgenre                      |
-|      1 | 1967 | Sgt. Pepper's Lonely Hearts Club Band | The Beatles    | Rock  | Rock & Roll, Psychedelic Rock |
-|      2 | 1966 | Pet Sounds                            | The Beach Boys | Rock  | Pop Rock, Psychedelic Rock    |
-|      3 | 1966 | Revolver                              | The Beatles    | Rock  | Psychedelic Rock, Pop Rock    |
-|      4 | 1965 | Highway 61 Revisited                  | Bob Dylan      | Rock  | Folk Rock, Blues Rock         |
-
-
-We process each dataset slightly differently.
-Recall that for the albums data, some of the fields as described above are treated differently. So, we pre-process
-them further before they go for indexing.
-
-#+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
   ;; Simple sample data - straightforward splits of columns
   (defonce sample-data (-> sample-data-file
                            read-csv-resource-file
@@ -158,7 +120,6 @@ them further before they go for indexing.
         (process-csv-column :Genre)
         (process-csv-column :Subgenre)))
 
-
   (defonce album-data (->> albums-file
                            read-csv-resource-file
                            ld/vecs->maps
@@ -167,10 +128,53 @@ them further before they go for indexing.
 #+END_SRC
 
 
-Next, we construct analyzers to demonstrate how to handle fields that may require
-different handling
+** A Glimpse of the Data
+
+- Sample, hand-coded documents. Plain, simple data.
+#+BEGIN_SRC clojure :results value table :exports both
+  ;; In the common namespace
+  (take 5 (read-csv-resource-file sample-data-file))
+#+END_SRC
+
+#+RESULTS:
+| first-name | last-name   | age | real  | gender | bio                                                                                                                                                          |
+| Suppandi   | Varadarajan |  16 | false | m      | A wonderful, innocent soul. You'll enjoy his antics.                                                                                                         |
+| Shikari    | Shambhu     |  32 | False | m      | Carries a gun. But no bullets. Animals love him.                                                                                                             |
+| Chacha     | Chaudhary   |  64 | FalSe | m      | The supercomputer. And then some more!                                                                                                                       |
+| Sabu       | Jupiterwala |   2 | false | m      | Yes, of legal age. Just a different age-scale because of the planet he comes from. Strong, powerful, but kind. Because, not an earthling. Children love him. |
+
+- Albums data
+  - The columns ~Genre~ and ~Subgenre~, are comma-separated values themselves
+    - They are to be pre-processed before feeding to /lucene-clj/
+    - These are multi-valued /fields/.
+
+
+#+BEGIN_SRC clojure :results value table :exports both
+;; In the common namespace
+(take 5 (read-csv-resource-file albums-file))
+#+END_SRC
+
+#+RESULTS:
+| Number | Year | Album                                 | Artist         | Genre | Subgenre                      |
+|      1 | 1967 | Sgt. Pepper's Lonely Hearts Club Band | The Beatles    | Rock  | Rock & Roll, Psychedelic Rock |
+|      2 | 1966 | Pet Sounds                            | The Beach Boys | Rock  | Pop Rock, Psychedelic Rock    |
+|      3 | 1966 | Revolver                              | The Beatles    | Rock  | Psychedelic Rock, Pop Rock    |
+|      4 | 1965 | Highway 61 Revisited                  | Bob Dylan      | Rock  | Folk Rock, Blues Rock         |
+
+
+** Creating Analyzers
+We need to process each dataset slightly differently. Analyzers process each field's content in a manner that is apt - according to what the programmer/domain-expert decides. Some fields need to be tokenized and stemmed, while some are to be treated verbatim. Think - natural language text, versus some /proper nouns/ like company name or music /genre/.
+
+- The sample characters dataset gets no special treatment for its fields. So, we use the /standard analyzer/ for processing it.
+
+- In the albums dataset, the ~Year~, ~Genre~ and ~Subgenre~ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/. Other fields can be treated like normal text. So, in this case, we use a *composed* analyzer that can treat each field in its special way.
+
+*Note* that the same analyzers we use while creating indexes should be used when querying the index for /search/ and /suggest/ to avoid surprises. Obvious, no?
+
+Here's how we create analyzers.
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
+  ;; In the common namespace
   ;; This is the default analyzer, an instance of the StandardAnalyzer
   ;; of Lucene
   (defonce default-analyzer (analyzers/standard-analyzer))
@@ -191,10 +195,7 @@ different handling
 
 ** Some simple REPL-runs
 
-Once we have the background setup done and explained, let us move ahead to
-demonstrating indexing and searching. You may want to try the following in
-a *REPL* by requiring the namespace the prior code is in and then playing along.
-I've used the /dev/ namespace below, the code for which can be found [[file:dev/dev.clj][here]].
+With the background setup done and explained, let us move ahead to demonstrating indexing and searching. You may want to try the following in a *REPL* by requiring the namespace the prior code is in and then playing along. I've used the /dev/ namespace below, the code for which can be found [[file:dev/dev.clj][here]].
 
 *** Preamble
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
@@ -202,7 +203,7 @@ I've used the /dev/ namespace below, the code for which can be found [[file:dev/
     (:require [msync.lucene :as lucene]
               [msync.lucene
                [document :as ld]
-               [tests-common :refer :all]]))
+               [tests-common :as common]]))
 #+END_SRC
 
 
@@ -215,21 +216,21 @@ I've used the /dev/ namespace below, the code for which can be found [[file:dev/
 *** Create an index
 In memory
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (defonce index (lucene/create-index! :type :memory
-                                :analyzer album-data-analyzer))
+  (defonce album-index (lucene/create-index! :type :memory
+                                             :analyzer common/album-data-analyzer))
 #+END_SRC
 
 Or, on disk
 #+BEGIN_SRC clojure :tangle no :results none
-  (defonce index (lucene/create-index! :type :disk
-                            :path "/path/to/index/directory"
-                            :analyzer album-data-analyzer))
+  (defonce album-index (lucene/create-index! :type :disk
+                                             :path "/path/to/index/directory"
+                                             :analyzer common/album-data-analyzer))
 #+END_SRC
 
 A sample of the album data for reference.
 The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and split further.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-(take 3 album-data)
+(take 3 common/album-data)
 #+END_SRC
 
 #+RESULTS:
@@ -255,18 +256,18 @@ The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and sp
 #+end_src
 
 
-*** Index documents - which are Clojure maps
-Documents are Clojure maps. Each /key-value/ in the map represents one ~org.apache.lucene.document.Field~. The options passed to the `index!` function control behavior in various ways
+*** Index documents
+Documents are /Clojure maps/. Each /key-value/ in the map represents one ~org.apache.lucene.document.Field~. The options passed to the `index!` function control behavior in various ways
 - ~:stored-fields~ - Lucene can index for efficient searching, but to save space, it need not store all the field values. If you want Lucene to also store the contents, pass them as a collection to this argument. The alternative is to use Lucene to index without storing large fields, and 
 - ~:suggest-fields~ - Fields that are treated specially during indexing, allowing Lucene to create internal structures for quick prefix matching.
 - ~:context-fn~ - Lucene allows for a list of contexts to associate with the /suggest/ fields, which allow us to filter on them while querying for suggestions.
 
-In the following, we instruct the /index!/ function to 
+In the following, we instruct the `index!` function to 
 - Store the mentioned fields
-- Use the /:Album/ and /:Artist/ fields to index for suggestions
+- Use the /:Album/ and /:Artist/ fields to index for suggestions - this uses some special processing and storage in the index.
 - Use the /:Genre/ field as context. Note that /:Genre/ is itself can be multiple values for each document, and that works fine.
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (lucene/index! index album-data
+  (lucene/index! album-index common/album-data
                  {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
                   :suggest-fields [:Album :Artist]
                   :context-fn     :Genre})
@@ -278,96 +279,87 @@ A simple search example, in which we pass a /map/ specifying the field, and the 
 The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ which is an identifier that Lucene manages. Notice that the result - /:hit/ - is a Lucene /Document/ object.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index {:Year "1979"}
+  (lucene/search album-index {:Year "1979"}
                  {:results-per-page 2})
 #+END_SRC
 
 #+RESULTS:
 #+begin_src clojure
-[{:hit
-  #object[org.apache.lucene.document.Document 0x1fbc4ce3 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"],
+[{:doc-id 7,
   :score 1.6102078,
-  :doc-id 7}
- {:hit
-  #object[org.apache.lucene.document.Document 0x44e816d8 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"],
+  :hit
+  #object[org.apache.lucene.document.Document 0x3355c457 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"]}
+ {:doc-id 67,
   :score 1.6102078,
-  :doc-id 67}]
+  :hit
+  #object[org.apache.lucene.document.Document 0x4cf77cf0 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"]}]
 #+end_src
 
 
 For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index {:Year "1977"}
-                 {:results-per-page 3
+  (lucene/search album-index {:Year "1979"}
+                 {:results-per-page 2
                   :hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
 #+begin_src clojure
-[{:hit
-  {:Number "26",
-   :Year "1977",
-   :Album "Rumours",
-   :Artist "Fleetwood Mac",
+[{:doc-id 7,
+  :score 1.6102078,
+  :hit
+  {:Number "8",
+   :Year "1979",
+   :Album "London Calling",
+   :Artist "The Clash",
    :Genre "Rock",
-   :Subgenre "Pop Rock"},
-  :score 1.4994705,
-  :doc-id 25}
- {:hit
-  {:Number "41",
-   :Year "1977",
-   :Album "Never Mind the Bollocks Here's the Sex Pistols",
-   :Artist "Sex Pistols",
-   :Genre "Rock",
-   :Subgenre "Punk"},
-  :score 1.4994705,
-  :doc-id 40}
- {:hit
-  {:Number "70",
-   :Year "1977",
-   :Album "The Stranger",
-   :Artist "Billy Joel",
-   :Genre "Rock",
-   :Subgenre "Pop Rock"},
-  :score 1.4994705,
-  :doc-id 69}]
+   :Subgenre "New Wave"}}
+ {:doc-id 67,
+  :score 1.6102078,
+  :hit
+  {:Number "68",
+   :Year "1979",
+   :Album "Off the Wall",
+   :Artist "Michael Jackson",
+   :Genre "Pop",
+   :Subgenre "Ballad"}}]
 #+end_src
 
 Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as collections. The /document->map/ function isn't smart to identify that, and needs a hint to make that happen.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index
+  (lucene/search album-index
                  {:Year "1979"}
                  {:results-per-page 2
                   :hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])})
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
-[{:hit
+#+begin_src clojure
+[{:doc-id 7,
+  :score 1.6102078,
+  :hit
   {:Number "8",
    :Year "1979",
    :Album "London Calling",
    :Artist "The Clash",
    :Genre ["Rock"],
-   :Subgenre ["Punk" "New Wave"]},
+   :Subgenre ["Punk" "New Wave"]}}
+ {:doc-id 67,
   :score 1.6102078,
-  :doc-id 7}
- {:hit
+  :hit
   {:Number "68",
    :Year "1979",
    :Album "Off the Wall",
    :Artist "Michael Jackson",
    :Genre ["Funk / Soul" "Pop"],
-   :Subgenre ["Disco" "Soul" "Ballad"]},
-  :score 1.6102078,
-  :doc-id 67}]
-#+END_SRC
+   :Subgenre ["Disco" "Soul" "Ballad"]}}]
+#+end_src
 
 
 Paginated query results are supported via the /:page/ option. Also, the following example projects a subset of the document fields by passing a modified function as the /:hit->doc/ argument.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search index 
+  (lucene/search album-index 
                  {:Year "1968"} ;; Map of field-values to search with
                  {:results-per-page 5 ;; Control the number of results returned
                   :page 4             ;; Page number, starting 0 as default
@@ -377,11 +369,11 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
-[{:hit {:Year "1968", :Album "The Drifters' Golden Hits"},
+#+begin_src clojure
+[{:doc-id 458,
   :score 1.4311604,
-  :doc-id 458}]
-#+END_SRC
+  :hit {:Year "1968", :Album "The Drifters' Golden Hits"}}]
+#+end_src
 
 
 *** Search variations
@@ -389,63 +381,59 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 - Simple search
 Searching in a single field, for a single value
 #+BEGIN_SRC clojure :tangle no :results no
-  (lucene/search index {:Year "1967"})
+  (lucene/search album-index {:Year "1967"})
 #+END_SRC
 
 - OR Search
 Searching in a single field, where _any_ of the values in the /set/ are allowed
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-  (lucene/search index {:Year #{"1964" "1965"}}
-                 {:results-per-page 3
+  (lucene/search album-index {:Year #{"1960" "1965"}}
+                 {:results-per-page 5
                   :hit->doc #(-> % ld/document->map (select-keys [:Year :Album]))})
 #+END_SRC
 
 #+RESULTS:
 #+begin_src clojure
-[{:hit {:Year "1964", :Album "Meet The Beatles!"},
-  :score 2.1675856,
-  :doc-id 52}
- {:hit {:Year "1964", :Album "Folk Singer"},
-  :score 2.1675856,
-  :doc-id 281}
- {:hit {:Year "1964", :Album "A Hard Day's Night"},
-  :score 2.1675856,
-  :doc-id 306}]
+[{:doc-id 118,
+  :score 2.2562923,
+  :hit {:Year "1960", :Album "At Last!"}}
+ {:doc-id 347,
+  :score 2.2562923,
+  :hit {:Year "1960", :Album "Muddy Waters at Newport 1960"}}
+ {:doc-id 357,
+  :score 2.2562923,
+  :hit {:Year "1960", :Album "Sketches of Spain"}}
+ {:doc-id 3,
+  :score 1.6102078,
+  :hit {:Year "1965", :Album "Highway 61 Revisited"}}
+ {:doc-id 4,
+  :score 1.6102078,
+  :hit {:Year "1965", :Album "Rubber Soul"}}]
 #+end_src
 
 - AND Search
 When looking for multiple terms in a single field, pass a /vector/.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-(lucene/search index {:Album ["complete" "unbelievable"]} {:hit->doc ld/document->map})
+(lucene/search album-index {:Album ["complete" "unbelievable"]} {:hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
 #+begin_src clojure
-[{:hit
+[{:doc-id 253,
+  :score 3.0571077,
+  :hit
   {:Number "254",
    :Year "1966",
    :Album
    "Complete & Unbelievable: The Otis Redding Dictionary of Soul",
    :Artist "Otis Redding",
    :Genre "Funk / Soul",
-   :Subgenre "Soul"},
-  :score 3.1357086,
-  :doc-id 253}
- {:hit
-  {:Number "254",
-   :Year "1966",
-   :Album
-   "Complete & Unbelievable: The Otis Redding Dictionary of Soul",
-   :Artist "Otis Redding",
-   :Genre "Funk / Soul",
-   :Subgenre "Soul"},
-  :score 3.1357086,
-  :doc-id 753}]
+   :Subgenre "Soul"}}]
 #+end_src
 
 Be sure that your queries are semantically right for the dataset. For example, /AND/-ing over two different years will lead to an empty result-set, obviously.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-(lucene/search index {:Year ["1964" "1965"]})
+(lucene/search album-index {:Year ["1964" "1965"]})
 #+END_SRC
 
 #+RESULTS:
@@ -456,65 +444,38 @@ Be sure that your queries are semantically right for the dataset. For example, /
 - Phrase search
 Spaces in the query string are inferred to mean a phrase search operation
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-  (lucene/search index {:Album "the sun"} {:hit->doc ld/document->map})
+  (lucene/search album-index {:Album "the sun"} {:hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
 #+begin_src clojure
-[{:hit
+[{:doc-id 10,
+  :score 2.8861985,
+  :hit
   {:Number "11",
    :Year "1976",
    :Album "The Sun Sessions",
    :Artist "Elvis Presley",
    :Genre "Rock",
-   :Subgenre "Rock & Roll"},
-  :score 2.9202006,
-  :doc-id 10}
- {:hit
-  {:Number "11",
-   :Year "1976",
-   :Album "The Sun Sessions",
-   :Artist "Elvis Presley",
-   :Genre "Rock",
-   :Subgenre "Rock & Roll"},
-  :score 2.9202006,
-  :doc-id 510}
- {:hit
+   :Subgenre "Rock & Roll"}}
+ {:doc-id 287,
+  :score 2.544825,
+  :hit
   {:Number "288",
    :Year "1968",
    :Album "Anthem of the Sun",
    :Artist "Grateful Dead",
    :Genre "Rock",
-   :Subgenre "Psychedelic Rock"},
-  :score 2.5748055,
-  :doc-id 287}
- {:hit
+   :Subgenre "Psychedelic Rock"}}
+ {:doc-id 310,
+  :score 2.544825,
+  :hit
   {:Number "311",
    :Year "1994",
    :Album "The Sun Records Collection",
    :Artist "Various",
    :Genre "& Country",
-   :Subgenre "Rockabilly"},
-  :score 2.5748055,
-  :doc-id 310}
- {:hit
-  {:Number "288",
-   :Year "1968",
-   :Album "Anthem of the Sun",
-   :Artist "Grateful Dead",
-   :Genre "Rock",
-   :Subgenre "Psychedelic Rock"},
-  :score 2.5748055,
-  :doc-id 787}
- {:hit
-  {:Number "311",
-   :Year "1994",
-   :Album "The Sun Records Collection",
-   :Artist "Various",
-   :Genre "& Country",
-   :Subgenre "Rockabilly"},
-  :score 2.5748055,
-  :doc-id 810}]
+   :Subgenre "Rockabilly"}}]
 #+end_src
 
 - Searching across fields
@@ -522,29 +483,20 @@ Spaces in the query string are inferred to mean a phrase search operation
 This is an /AND/ operation
 
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-  (lucene/search index {:Album "the sun" :Year "1976"} {:hit->doc ld/document->map})
+  (lucene/search album-index {:Album "the sun" :Year "1976"} {:hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
 #+begin_src clojure
-[{:hit
+[{:doc-id 10,
+  :score 4.56387,
+  :hit
   {:Number "11",
    :Year "1976",
    :Album "The Sun Sessions",
    :Artist "Elvis Presley",
    :Genre "Rock",
-   :Subgenre "Rock & Roll"},
-  :score 4.606601,
-  :doc-id 10}
- {:hit
-  {:Number "11",
-   :Year "1976",
-   :Album "The Sun Sessions",
-   :Artist "Elvis Presley",
-   :Genre "Rock",
-   :Subgenre "Rock & Roll"},
-  :score 4.606601,
-  :doc-id 510}]
+   :Subgenre "Rock & Roll"}}]
 #+end_src
 
 
@@ -556,14 +508,13 @@ Notice that in the /suggest/ function call, the field and suggestion-prefix are 
 From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/suggest index :Album "par"
+  (lucene/suggest album-index :Album "par"
                   {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
-                   :fuzzy? false
                    :contexts ["Electronic"]})
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 [{:hit
   {:Number "140",
    :Year "1978",
@@ -573,18 +524,18 @@ From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a 
    :Subgenre ["New Wave" "Pop Rock" "Punk" "Disco"]},
   :score 1.0,
   :doc-id 139}]
-#+END_SRC
+#+end_src
 
 We can ask for fuzzy matching when querying for suggestions.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/suggest index :Album "per"
+  (lucene/suggest album-index :Album "per"
                   {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
                    :fuzzy? true
                    :contexts ["Electronic"]})
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
+#+begin_src clojure
 [{:hit
   {:Number "140",
    :Year "1978",
@@ -603,37 +554,37 @@ We can ask for fuzzy matching when querying for suggestions.
    :Subgenre ["Pop Rock" "Funk" "Soundtrack" "Synth-pop"]},
   :score 2.0,
   :doc-id 75}]
-#+END_SRC
+#+end_src
 
 
 **** Or, do a fuzzy search
 #+BEGIN_SRC clojure :results output code m:tangle dev/dev.clj :exports both
-  (lucene/search index {:Album "forever"}
+  (lucene/search album-index {:Album "forever"}
                  {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
                   :fuzzy? true})
 #+END_SRC
 
 #+RESULTS:
-#+BEGIN_SRC clojure
-[{:hit
+#+begin_src clojure
+[{:doc-id 39,
+  :score 3.0850303,
+  :hit
   {:Number "40",
    :Year "1967",
    :Album "Forever Changes",
    :Artist "Love",
    :Genre ["Rock"],
-   :Subgenre ["Folk Rock" "Psychedelic Rock"]},
-  :score 3.0850306,
-  :doc-id 39}
- {:hit
+   :Subgenre ["Folk Rock" "Psychedelic Rock"]}}
+ {:doc-id 131,
+  :score 0.9592955,
+  :hit
   {:Number "132",
    :Year "1977",
    :Album "Saturday Night Fever: The Original Movie Sound Track",
    :Artist "Various Artists",
    :Genre ["Electronic" "�Stage & Screen"],
-   :Subgenre ["Soundtrack" "�Disco"]},
-  :score 0.95929563,
-  :doc-id 131}]
-#+END_SRC
+   :Subgenre ["Soundtrack" "�Disco"]}}]
+#+end_src
 
 
 * Additional notes

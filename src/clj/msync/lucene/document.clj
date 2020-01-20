@@ -57,6 +57,18 @@
   (assoc m k (conj (m k []) v)))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(defn vecs->maps
+  "Collection of vectors, with the first considered the header.
+  [[field1 field2] [f11 f12] [f21 f22]] =>
+  [{:field1 f11 :field2 f22} {:field1 f21 :field2 f22}]
+  Returns a collection of maps, where the key is the corresponding header field."
+  ([doc-vecs-with-header]
+   (apply vecs->maps ((juxt first rest) doc-vecs-with-header)))
+  ([header-vec doc-vecs]
+   (map zipmap (->> header-vec
+                    (map keyword)
+                    repeat)
+        doc-vecs)))
 
 (defn map->document [m {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn]}]
   "Convert a map to a Lucene document.
@@ -90,10 +102,6 @@
       (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
     doc))
 
-(defn fn:map->document [doc-opts]
-  (fn [doc-map]
-    (map->document doc-map doc-opts)))
-
 
 (defn document->map
   "Convenience function.
@@ -115,20 +123,10 @@
       {}
       document)))
 
+(defn fn:map->document [doc-opts]
+  (fn [doc-map]
+    (map->document doc-map doc-opts)))
+
 (defn fn:document->map [& opt-args]
   (fn [doc]
     (apply document->map doc opt-args)))
-
-(defn vecs->maps
-  "Collection of vectors, with the first considered the header.
-  [[field1 field2] [f11 f12] [f21 f22]] =>
-  [{:field1 f11 :field2 f22} {:field1 f21 :field2 f22}]
-  Returns a collection of maps, where the key is the corresponding header field."
-  ([doc-vecs-with-header]
-   (apply vecs->maps ((juxt first rest) doc-vecs-with-header)))
-  ([header-vec doc-vecs]
-   (map zipmap (->> header-vec
-                    (map keyword)
-                    repeat)
-        doc-vecs)))
-
