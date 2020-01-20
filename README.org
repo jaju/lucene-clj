@@ -641,6 +641,6 @@ We can ask for fuzzy matching when querying for suggestions.
 
 
 * License
-Copyright © 2018-19 Ravindra R. Jaju
+Copyright © 2018-2020 Ravindra R. Jaju
 
 Distributed under the Eclipse Public License either version 1.0 or (at your option) any later version.
