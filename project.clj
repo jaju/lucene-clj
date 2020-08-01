@@ -1,4 +1,4 @@
-(def lucene-version "8.5.1")
+(def lucene-version "8.6.0")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
@@ -17,7 +17,7 @@
   :javac-options ["-target" "8" "-source" "8" "-deprecation" "-Xlint:-options"]
 
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "1.0.0"]
-                                   [criterium "0.4.5"]]
+                                   [criterium "0.4.6"]]
                     :source-paths ["test" "dev"]
                     :resource-paths ["test-resources"]}
 
