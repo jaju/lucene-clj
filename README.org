@@ -80,49 +80,49 @@ Lucene consumes /documents/, each of which is made up of /fields/ having values.
 To prepare our content for ingestion and indexing, we do some straightforward CSV parsing and conversion of each row into a map. Each column has a name and is used as the key for the field name in the document-map. All the preparation code is in the [[file:test/msync/lucene/tests_common.clj][msync.lucene.tests-common]] test namespace, which we'll refer to as the ~common~ namespace where required for clarity. We use two CSV datasets as our sources of /documents/ to create two indexes, to demonstrate some distinct use-cases. All data files are in the ~test-resources~ subdirectory.
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :exports none :results none
-  (ns msync.lucene.tests-common
-    (:require [msync.lucene
-               [analyzers :as analyzers]
-               [document :as ld]]
-              [clojure.data.csv :as csv]
-              [clojure.java.io :as io]
-              [clojure.string :as s]))
+(ns msync.lucene.tests-common
+  (:require [msync.lucene
+             [analyzers :as analyzers]
+             [document :as ld]]
+            [clojure.data.csv :as csv]
+            [clojure.java.io :as io]
+            [clojure.string :as s]))
 
-  (defn read-csv-resource-file
-    "Locate a file on the resource path and parse it as CSV,
-    creating a sequence of rows - each row being a list of the
-    CSV column-values"
-    [filename]
-    (-> filename
-        io/resource
-        slurp
-        csv/read-csv))
+(defn read-csv-resource-file
+  "Locate a file on the resource path and parse it as CSV,
+  creating a sequence of rows - each row being a list of the
+  CSV column-values"
+  [filename]
+  (-> filename
+      io/resource
+      slurp
+      csv/read-csv))
 
-  ;; The two datasets
-  (defonce sample-data-file "sample-data.csv")
-  (defonce albums-file "albumlist.csv")
+;; The two datasets
+(defonce sample-data-file "sample-data.csv")
+(defonce albums-file "albumlist.csv")
 
-  ;; Simple sample data - straightforward splits of columns
-  (defonce sample-data (-> sample-data-file
-                           read-csv-resource-file
-                           ld/vecs->maps))
+;; Simple sample data - straightforward splits of columns
+(defonce sample-data (-> sample-data-file
+                         read-csv-resource-file
+                         ld/vecs->maps))
 
-  ;; Album data - handler for multi-valued columns,
-  ;; which happen to be comma-separated themselves.
-  (defn- process-csv-column [coll column]
-    (assoc coll column
-           (map s/trim (s/split (get coll column) #","))))
+;; Album data - handler for multi-valued columns,
+;; which happen to be comma-separated themselves.
+(defn- process-csv-column [coll column]
+  (assoc coll column
+         (map s/trim (s/split (get coll column) #","))))
 
-  ;; These two columns are multi-valued
-  (defn process-album-data-row [row]
-    (-> row
-        (process-csv-column :Genre)
-        (process-csv-column :Subgenre)))
+;; These two columns are multi-valued
+(defn process-album-data-row [row]
+  (-> row
+      (process-csv-column :Genre)
+      (process-csv-column :Subgenre)))
 
-  (defonce album-data (->> albums-file
-                           read-csv-resource-file
-                           ld/vecs->maps
-                           (map process-album-data-row)))
+(defonce album-data (->> albums-file
+                         read-csv-resource-file
+                         ld/vecs->maps
+                         (map process-album-data-row)))
 
 #+END_SRC
 
@@ -174,22 +174,22 @@ In the albums dataset, the ~Year~, ~Genre~ and ~Subgenre~ fields' texts are not 
 Here's how we create analyzers.
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
-  ;; In the common namespace
-  ;; This is the default analyzer, an instance of the StandardAnalyzer
-  ;; of Lucene
-  (defonce default-analyzer (analyzers/standard-analyzer))
+;; In the common namespace
+;; This is the default analyzer, an instance of the StandardAnalyzer
+;; of Lucene
+(defonce default-analyzer (analyzers/standard-analyzer))
 
-  ;; This analyzer considers field values verbatim
-  ;; Will not tokenize and stem
-  (defonce keyword-analyzer (analyzers/keyword-analyzer))
+;; This analyzer considers field values verbatim
+;; Will not tokenize and stem
+(defonce keyword-analyzer (analyzers/keyword-analyzer))
 
-  ;; A per-field analyzer, which composes other kinds of analyzers
-  ;; For album data, we have marked some fields as verbatim
-  (defonce album-data-analyzer
-    (analyzers/per-field-analyzer default-analyzer
-                                  {:Year     keyword-analyzer
-                                   :Genre    keyword-analyzer
-                                   :Subgenre keyword-analyzer}))
+;; A per-field analyzer, which composes other kinds of analyzers
+;; For album data, we have marked some fields as verbatim
+(defonce album-data-analyzer
+  (analyzers/per-field-analyzer default-analyzer
+                                {:Year     keyword-analyzer
+                                 :Genre    keyword-analyzer
+                                 :Subgenre keyword-analyzer}))
 #+END_SRC
 
 
@@ -199,11 +199,11 @@ With the background setup done and explained, let us move ahead to demonstrating
 
 *** Preamble
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (ns dev
-    (:require [msync.lucene :as lucene]
-              [msync.lucene
-               [document :as ld]
-               [tests-common :as common]]))
+(ns dev
+  (:require [msync.lucene :as lucene]
+            [msync.lucene
+             [document :as ld]
+             [tests-common :as common]]))
 #+END_SRC
 
 
@@ -268,10 +268,10 @@ In the following, we instruct the `index!` function to
 - Use the /:Album/ and /:Artist/ fields to index for suggestions - this uses some special processing and storage in the index.
 - Use the /:Genre/ field as context. Note that /:Genre/ is itself can be multiple values for each document, and that works fine.
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (lucene/index! album-index common/album-data
-                 {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
-                  :suggest-fields [:Album :Artist]
-                  :context-fn     :Genre})
+(lucene/index! album-index common/album-data
+               {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
+                :suggest-fields [:Album :Artist]
+                :context-fn     :Genre})
 #+END_SRC
 
 
@@ -280,8 +280,8 @@ A simple search example, in which we pass a /map/ specifying the field, and the 
 The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ which is an identifier that Lucene manages. Notice that the result - /:hit/ - is a Lucene /Document/ object.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search album-index {:Year "1979"}
-                 {:results-per-page 2})
+(lucene/search album-index {:Year "1979"}
+               {:results-per-page 2})
 #+END_SRC
 
 #+RESULTS:
@@ -300,9 +300,9 @@ The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ wh
 
 For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search album-index {:Year "1979"}
-                 {:results-per-page 2
-                  :hit->doc ld/document->map})
+(lucene/search album-index {:Year "1979"}
+               {:results-per-page 2
+                :hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
@@ -331,10 +331,10 @@ For convenience, /lucene-clj/ has a function that can be used to convert the Luc
 Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as collections. The /document->map/ function isn't smart to identify that, and needs a hint to make that happen.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search album-index
-                 {:Year "1979"}
-                 {:results-per-page 2
-                  :hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])})
+(lucene/search album-index
+               {:Year "1979"}
+               {:results-per-page 2
+                :hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])})
 #+END_SRC
 
 #+RESULTS:
@@ -363,13 +363,13 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
 
 Paginated query results are supported via the /:page/ option. Also, the following example projects a subset of the document fields by passing a modified function as the /:hit->doc/ argument.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/search album-index 
-                 {:Year "1968"} ;; Map of field-values to search with
-                 {:results-per-page 5 ;; Control the number of results returned
-                  :page 4             ;; Page number, starting 0 as default
-                  :hit->doc         #(-> %
-                                         ld/document->map
-                                         (select-keys [:Year :Album]))})
+(lucene/search album-index
+               {:Year "1968"} ;; Map of field-values to search with
+               {:results-per-page 5 ;; Control the number of results returned
+                :page 4             ;; Page number, starting 0 as default
+                :hit->doc         #(-> %
+                                       ld/document->map
+                                       (select-keys [:Year :Album]))})
 #+END_SRC
 
 #+RESULTS:
@@ -386,7 +386,7 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 - Simple search
 Searching in a single field, for a single value
 #+BEGIN_SRC clojure :tangle no :results no
-  (lucene/search album-index {:Year "1967"} {:results-per-page 2})
+(lucene/search album-index {:Year "1967"} {:results-per-page 2})
 #+END_SRC
 
 #+RESULTS:
@@ -395,9 +395,9 @@ Searching in a single field, for a single value
 - OR Search
 Searching in a single field, where _any_ of the values in the /set/ are allowed
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-  (lucene/search album-index {:Year #{"1960" "1965"}}
-                 {:results-per-page 5
-                  :hit->doc #(-> % ld/document->map (select-keys [:Year :Album]))})
+(lucene/search album-index {:Year #{"1960" "1965"}}
+               {:results-per-page 5
+                :hit->doc #(-> % ld/document->map (select-keys [:Year :Album]))})
 #+END_SRC
 
 #+RESULTS:
@@ -455,7 +455,7 @@ Be sure that your queries are semantically right for the dataset. For example, /
 - Phrase search
 Spaces in the query string are inferred to mean a phrase search operation
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-  (lucene/search album-index {:Album "the sun"} {:hit->doc ld/document->map})
+(lucene/search album-index {:Album "the sun"} {:hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
@@ -494,7 +494,7 @@ Spaces in the query string are inferred to mean a phrase search operation
 This is an /AND/ operation
 
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
-  (lucene/search album-index {:Album "the sun" :Year "1976"} {:hit->doc ld/document->map})
+(lucene/search album-index {:Album "the sun" :Year "1976"} {:hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
@@ -520,9 +520,9 @@ Notice that in the /suggest/ function call, the field and suggestion-prefix are 
 From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/suggest album-index :Album "par"
-                  {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
-                   :contexts ["Electronic"]})
+(lucene/suggest album-index :Album "par"
+                {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
+                 :contexts ["Electronic"]})
 #+END_SRC
 
 #+RESULTS:
@@ -541,10 +541,10 @@ From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a 
 
 We can ask for fuzzy matching when querying for suggestions.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
-  (lucene/suggest album-index :Album "per"
-                  {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
-                   :fuzzy? true
-                   :contexts ["Electronic"]})
+(lucene/suggest album-index :Album "per"
+                {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
+                 :fuzzy? true
+                 :contexts ["Electronic"]})
 #+END_SRC
 
 #+RESULTS:
@@ -573,9 +573,9 @@ We can ask for fuzzy matching when querying for suggestions.
 
 **** Or, do a fuzzy search
 #+BEGIN_SRC clojure :results output code m:tangle dev/dev.clj :exports both
-  (lucene/search album-index {:Album "forever"}
-                 {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
-                  :fuzzy? true})
+(lucene/search album-index {:Album "forever"}
+               {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
+                :fuzzy? true})
 #+END_SRC
 
 #+RESULTS:
