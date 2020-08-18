@@ -1,4 +1,3 @@
-
 #+BABEL: :session *clojure-nrepl* :cache yes :results value
 #+PROPERTY: header-args :comments link
 #+PROPERTY: noweb: yes
@@ -130,20 +129,20 @@ To prepare our content for ingestion and indexing, we do some straightforward CS
 
 ** A Glimpse of the Data
 
+We use two simple datasets, stored as CSV. Loading is straightforward CSV parsing and converting to maps -- the first rows in each file are the header rows, holding names of respective columns.
+
 - Sample, hand-coded documents. Plain, simple data.
 #+BEGIN_SRC clojure :results value table :exports both
   ;; In the common namespace
-  (take 5 (read-csv-resource-file sample-data-file))
+  (take 3 (read-csv-resource-file sample-data-file))
 #+END_SRC
 
 #+RESULTS:
-| first-name | last-name   | age | real  | gender | bio                                                                                                                                                          |
-| Suppandi   | Varadarajan |  16 | false | m      | A wonderful, innocent soul. You'll enjoy his antics.                                                                                                         |
-| Shikari    | Shambhu     |  32 | False | m      | Carries a gun. But no bullets. Animals love him.                                                                                                             |
-| Chacha     | Chaudhary   |  64 | FalSe | m      | The supercomputer. And then some more!                                                                                                                       |
-| Sabu       | Jupiterwala |   2 | false | m      | Yes, of legal age. Just a different age-scale because of the planet he comes from. Strong, powerful, but kind. Because, not an earthling. Children love him. |
+| first-name | last-name   | age | real  | gender | bio                                                  |
+| Suppandi   | Varadarajan |  16 | false | m      | A wonderful, innocent soul. You'll enjoy his antics. |
+| Shikari    | Shambhu     |  32 | False | m      | Carries a gun. But no bullets. Animals love him.     |
 
-- Albums data
+- Albums data. From Kaggle.
   - The columns ~Genre~ and ~Subgenre~, are comma-separated values themselves
     - They are to be pre-processed before feeding to /lucene-clj/
     - These are multi-valued /fields/.
@@ -151,25 +150,26 @@ To prepare our content for ingestion and indexing, we do some straightforward CS
 
 #+BEGIN_SRC clojure :results value table :exports both
 ;; In the common namespace
-(take 5 (read-csv-resource-file albums-file))
+(take 6 (read-csv-resource-file albums-file))
 #+END_SRC
 
 #+RESULTS:
-| Number | Year | Album                                 | Artist         | Genre | Subgenre                      |
-|      1 | 1967 | Sgt. Pepper's Lonely Hearts Club Band | The Beatles    | Rock  | Rock & Roll, Psychedelic Rock |
-|      2 | 1966 | Pet Sounds                            | The Beach Boys | Rock  | Pop Rock, Psychedelic Rock    |
-|      3 | 1966 | Revolver                              | The Beatles    | Rock  | Psychedelic Rock, Pop Rock    |
-|      4 | 1965 | Highway 61 Revisited                  | Bob Dylan      | Rock  | Folk Rock, Blues Rock         |
+| Number | Year | Album                                 | Artist         | Genre     | Subgenre                      |
+|      1 | 1967 | Sgt. Pepper's Lonely Hearts Club Band | The Beatles    | Rock      | Rock & Roll, Psychedelic Rock |
+|      2 | 1966 | Pet Sounds                            | The Beach Boys | Rock      | Pop Rock, Psychedelic Rock    |
+|      3 | 1966 | Revolver                              | The Beatles    | Rock      | Psychedelic Rock, Pop Rock    |
+|      4 | 1965 | Highway 61 Revisited                  | Bob Dylan      | Rock      | Folk Rock, Blues Rock         |
+|      5 | 1965 | Rubber Soul                           | The Beatles    | Rock, Pop | Pop Rock                      |
 
 
 ** Creating Analyzers
-We need to process each dataset slightly differently. Analyzers process each field's content in a manner that is apt - according to what the programmer/domain-expert decides. Some fields need to be tokenized and stemmed, while some are to be treated verbatim. Think - natural language text, versus some /proper nouns/ like company name or music /genre/.
+Analyzers process each field's content in a manner that is apt - according to what the programmer/domain-expert decides.
 
-- The sample characters dataset gets no special treatment for its fields. So, we use the /standard analyzer/ for processing it.
+Some fields need to be tokenized and stemmed, while some are to be treated verbatim. Natural language text, versus some /proper nouns/ like company name or music /genre/.
 
-- In the albums dataset, the ~Year~, ~Genre~ and ~Subgenre~ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/. Other fields can be treated like normal text. So, in this case, we use a *composed* analyzer that can treat each field in its special way.
+In the albums dataset, the ~Year~, ~Genre~ and ~Subgenre~ fields' texts are not to be tokenized and stemmed, or filtered for stop-words. Hence, they are configured to be analyzed with the /keyword analyzer/. Other fields can be treated like normal text. So, in this case, we use a *composed* analyzer that can treat each field in its special way.
 
-*Note* that the same analyzers we use while creating indexes should be used when querying the index for /search/ and /suggest/ to avoid surprises. Obvious, no?
+*Note* that the same analyzers we use while creating indexes should be used when querying the index for /search/ and /suggest/ to avoid surprises. This shouldn't be surprising.
 
 Here's how we create analyzers.
 
@@ -216,15 +216,15 @@ With the background setup done and explained, let us move ahead to demonstrating
 *** Create an index
 In memory
 #+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (defonce album-index (lucene/create-index! :type :memory
-                                             :analyzer common/album-data-analyzer))
+(defonce album-index (lucene/create-index! :type :memory
+                                           :analyzer common/album-data-analyzer))
 #+END_SRC
 
 Or, on disk
 #+BEGIN_SRC clojure :tangle no :results none
-  (defonce album-index (lucene/create-index! :type :disk
-                                             :path "/path/to/index/directory"
-                                             :analyzer common/album-data-analyzer))
+(defonce album-index (lucene/create-index! :type :disk
+                                           :path "/path/to/index/directory"
+                                           :analyzer common/album-data-analyzer))
 #+END_SRC
 
 A sample of the album data for reference.
@@ -253,6 +253,7 @@ The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and sp
   :Artist "The Beatles",
   :Genre ("Rock"),
   :Subgenre ("Psychedelic Rock" "Pop Rock")})
+
 #+end_src
 
 
@@ -288,11 +289,12 @@ The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ wh
 [{:doc-id 7,
   :score 1.6102078,
   :hit
-  #object[org.apache.lucene.document.Document 0x3355c457 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"]}
+  #object[org.apache.lucene.document.Document 0xb0511b4 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"]}
  {:doc-id 67,
   :score 1.6102078,
   :hit
-  #object[org.apache.lucene.document.Document 0x4cf77cf0 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"]}]
+  #object[org.apache.lucene.document.Document 0x212c2301 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"]}]
+
 #+end_src
 
 
@@ -323,6 +325,7 @@ For convenience, /lucene-clj/ has a function that can be used to convert the Luc
    :Artist "Michael Jackson",
    :Genre "Pop",
    :Subgenre "Ballad"}}]
+
 #+end_src
 
 Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as collections. The /document->map/ function isn't smart to identify that, and needs a hint to make that happen.
@@ -354,6 +357,7 @@ Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as col
    :Artist "Michael Jackson",
    :Genre ["Funk / Soul" "Pop"],
    :Subgenre ["Disco" "Soul" "Ballad"]}}]
+
 #+end_src
 
 
@@ -373,6 +377,7 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 [{:doc-id 458,
   :score 1.4311604,
   :hit {:Year "1968", :Album "The Drifters' Golden Hits"}}]
+
 #+end_src
 
 
@@ -381,8 +386,11 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 - Simple search
 Searching in a single field, for a single value
 #+BEGIN_SRC clojure :tangle no :results no
-  (lucene/search album-index {:Year "1967"})
+  (lucene/search album-index {:Year "1967"} {:results-per-page 2})
 #+END_SRC
+
+#+RESULTS:
+: '((:doc-id 0  :score 1.4528096  :hit #object(org.apache.lucene.document.Document 0x2007969c "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:1> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1967> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Sgt. Pepper's Lonely Hearts Club Band> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Beatles> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Rock & Roll> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Psychedelic Rock>>")) (:doc-id 12  :score 1.4528096  :hit #object(org.apache.lucene.document.Document 0xfb61ff "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:13> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1967> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:The Velvet Underground & Nico> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Velvet Underground> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Garage Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Art Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Experimental>>")))
 
 - OR Search
 Searching in a single field, where _any_ of the values in the /set/ are allowed
@@ -409,6 +417,7 @@ Searching in a single field, where _any_ of the values in the /set/ are allowed
  {:doc-id 4,
   :score 1.6102078,
   :hit {:Year "1965", :Album "Rubber Soul"}}]
+
 #+end_src
 
 - AND Search
@@ -429,6 +438,7 @@ When looking for multiple terms in a single field, pass a /vector/.
    :Artist "Otis Redding",
    :Genre "Funk / Soul",
    :Subgenre "Soul"}}]
+
 #+end_src
 
 Be sure that your queries are semantically right for the dataset. For example, /AND/-ing over two different years will lead to an empty result-set, obviously.
@@ -439,6 +449,7 @@ Be sure that your queries are semantically right for the dataset. For example, /
 #+RESULTS:
 #+begin_src clojure
 []
+
 #+end_src
 
 - Phrase search
@@ -497,6 +508,7 @@ This is an /AND/ operation
    :Artist "Elvis Presley",
    :Genre "Rock",
    :Subgenre "Rock & Roll"}}]
+
 #+end_src
 
 
@@ -524,6 +536,7 @@ From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a 
    :Subgenre ["New Wave" "Pop Rock" "Punk" "Disco"]},
   :score 1.0,
   :doc-id 139}]
+
 #+end_src
 
 We can ask for fuzzy matching when querying for suggestions.
@@ -554,6 +567,7 @@ We can ask for fuzzy matching when querying for suggestions.
    :Subgenre ["Pop Rock" "Funk" "Soundtrack" "Synth-pop"]},
   :score 2.0,
   :doc-id 75}]
+
 #+end_src
 
 
