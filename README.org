@@ -25,7 +25,7 @@ Notably
 
 * Dependency
 #+BEGIN_SRC clojure
-    [org.msync/lucene-clj "0.2.0-SNAPSHOT"]
+    [org.msync/lucene-clj "0.2.0-alpha"]
 #+END_SRC
 Available via [[https://clojars.org/search?q=lucene-clj][clojars]].
 
