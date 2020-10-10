@@ -7,7 +7,7 @@
 
 * What?
 
-A /straightforward/ and /low-noise/ Clojure wrapper for Apache Lucene.
+A simple Clojure wrapper for Apache Lucene (version 8.6.3).
 
 Key usage scenarios
 - Search :: The core use-case of Lucene.
@@ -32,7 +32,7 @@ Available via [[https://clojars.org/search?q=lucene-clj][clojars]].
 
 * Why?
 
-The primary use-case is for in-process text search needs for read-only datasets that can be managed on single-instance deployments. Because for multi-instance deployments, keeping modifications of data in sync is an effort. In other words, when you need light-weight text-search support without the hassle of setting up something like Solr. You may update the index if you wish, but have to take care of any race conditions, and since it is in-process, you will also need to take care of updating all instances in a multi-instance use scenario.
+The primary use-case is for in-process text search needs for read-only data-sets that can be managed on single-instance deployments. Because for multi-instance deployments, keeping modifications of data in sync is an effort. In other words, when you need light-weight text-search support without the hassle of setting up something like Solr. You may update the index if you wish, but have to take care of any race conditions, and since it is in-process, you will also need to take care of updating all instances in a multi-instance use scenario.
 
 The objectives are loosely as follows.
 
@@ -68,7 +68,7 @@ This is a pretty hand-wavy description, but useful enough for our purpose.
 
 Lucene consumes /documents/, each of which is made up of /fields/ having values. As is natural in Clojure, we represent all such things as /maps/.
 
-#+BEGIN_SRC clojure :results none
+#+BEGIN_SRC clojure :results none :ns user
   {
    :title-field "This is a title"
    :abstract-field "This is an abstract of what is to follow"
@@ -77,7 +77,7 @@ Lucene consumes /documents/, each of which is made up of /fields/ having values.
    }
 #+END_SRC
 
-To prepare our content for ingestion and indexing, we do some straightforward CSV parsing and conversion of each row into a map. Each column has a name and is used as the key for the field name in the document-map. All the preparation code is in the [[file:test/msync/lucene/tests_common.clj][msync.lucene.tests-common]] test namespace, which we'll refer to as the ~common~ namespace where required for clarity. We use two CSV datasets as our sources of /documents/ to create two indexes, to demonstrate some distinct use-cases. All data files are in the ~test-resources~ subdirectory.
+To prepare our content for ingestion and indexing, we do some straightforward CSV parsing and conversion of each row into a map. Each column has a name and is used as the key for the field name in the document-map. All the preparation code is in the [[file:test/msync/lucene/tests_common.clj][msync.lucene.tests-common]] test namespace, which we'll refer to as the ~common~ namespace where required for clarity. We use two CSV data-sets as our sources of /documents/ to create two indexes, to demonstrate some distinct use-cases. All data files are in the ~test-resources~ subdirectory.
 
 #+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :exports none :results none
 (ns msync.lucene.tests-common
@@ -134,13 +134,15 @@ We use two simple datasets, stored as CSV. Loading is straightforward CSV parsin
 - Sample, hand-coded documents. Plain, simple data.
 #+BEGIN_SRC clojure :results value table :exports both
   ;; In the common namespace
-  (take 3 (read-csv-resource-file sample-data-file))
+  (take 4 (read-csv-resource-file sample-data-file))
 #+END_SRC
 
 #+RESULTS:
 | first-name | last-name   | age | real  | gender | bio                                                  |
 | Suppandi   | Varadarajan |  16 | false | m      | A wonderful, innocent soul. You'll enjoy his antics. |
 | Shikari    | Shambhu     |  32 | False | m      | Carries a gun. But no bullets. Animals love him.     |
+| Chacha     | Chaudhary   |  64 | FalSe | m      | The supercomputer. And then some more!               |
+
 
 - Albums data. From Kaggle.
   - The columns ~Genre~ and ~Subgenre~, are comma-separated values themselves
@@ -185,6 +187,7 @@ Here's how we create analyzers.
 
 ;; A per-field analyzer, which composes other kinds of analyzers
 ;; For album data, we have marked some fields as verbatim
+;; Takes a default analyzer, and then a map of field to field-specific analyzer
 (defonce album-data-analyzer
   (analyzers/per-field-analyzer default-analyzer
                                 {:Year     keyword-analyzer
@@ -289,16 +292,16 @@ The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ wh
 [{:doc-id 7,
   :score 1.6102078,
   :hit
-  #object[org.apache.lucene.document.Document 0xb0511b4 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"]}
+  #object[org.apache.lucene.document.Document 0x4a4b9be8 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:8> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:London Calling> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Clash> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Punk> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:New Wave>>"]}
  {:doc-id 67,
   :score 1.6102078,
   :hit
-  #object[org.apache.lucene.document.Document 0x212c2301 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"]}]
+  #object[org.apache.lucene.document.Document 0x18bc5b63 "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:68> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1979> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Off the Wall> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:Michael Jackson> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Funk / Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Pop> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Disco> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Soul> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Ballad>>"]}]
 
 #+end_src
 
 
-For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map.
+For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map. But use beyond basic use-cases, supply your own.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/search album-index {:Year "1979"}
                {:results-per-page 2
@@ -328,7 +331,7 @@ For convenience, /lucene-clj/ has a function that can be used to convert the Luc
 
 #+end_src
 
-Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as collections. The /document->map/ function isn't smart to identify that, and needs a hint to make that happen.
+Notice though, that the /:Genre/ and /:Subgenre/ fields did not come back as collections. The /document->map/ function isn't smart to identify that, and needs a hint to make that happen. With the modified /hit->doc/ argument, the two fields come back as vectors with possibly multiple values.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/search album-index
@@ -366,7 +369,7 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 (lucene/search album-index
                {:Year "1968"} ;; Map of field-values to search with
                {:results-per-page 5 ;; Control the number of results returned
-                :page 4             ;; Page number, starting 0 as default
+                :page 2             ;; Page number, starting 0 as default
                 :hit->doc         #(-> %
                                        ld/document->map
                                        (select-keys [:Year :Album]))})
@@ -374,9 +377,23 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 
 #+RESULTS:
 #+begin_src clojure
-[{:doc-id 458,
+[{:doc-id 160,
   :score 1.4311604,
-  :hit {:Year "1968", :Album "The Drifters' Golden Hits"}}]
+  :hit {:Year "1968", :Album "The Dock of the Bay"}}
+ {:doc-id 170,
+  :score 1.4311604,
+  :hit {:Year "1968", :Album "The Notorious Byrd Brothers"}}
+ {:doc-id 204,
+  :score 1.4311604,
+  :hit {:Year "1968", :Album "Wheels of Fire"}}
+ {:doc-id 233,
+  :score 1.4311604,
+  :hit {:Year "1968", :Album "Bookends"}}
+ {:doc-id 257,
+  :score 1.4311604,
+  :hit
+  {:Year "1968",
+   :Album "The Kinks Are The Village Green Preservation Society"}}]
 
 #+end_src
 
@@ -385,12 +402,32 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 
 - Simple search
 Searching in a single field, for a single value
-#+BEGIN_SRC clojure :tangle no :results no
-(lucene/search album-index {:Year "1967"} {:results-per-page 2})
+#+BEGIN_SRC clojure :tangle no :results output code
+(lucene/search album-index {:Year "1967"} {:results-per-page 2 :hit->doc ld/document->map})
 #+END_SRC
 
 #+RESULTS:
-: '((:doc-id 0  :score 1.4528096  :hit #object(org.apache.lucene.document.Document 0x2007969c "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:1> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1967> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:Sgt. Pepper's Lonely Hearts Club Band> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Beatles> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Rock & Roll> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Psychedelic Rock>>")) (:doc-id 12  :score 1.4528096  :hit #object(org.apache.lucene.document.Document 0xfb61ff "Document<stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Number:13> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Year:1967> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Album:The Velvet Underground & Nico> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Artist:The Velvet Underground> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Genre:Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Garage Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Art Rock> stored,indexed,tokenized,indexOptions=DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS<Subgenre:Experimental>>")))
+#+begin_src clojure
+[{:doc-id 0,
+  :score 1.4528096,
+  :hit
+  {:Number "1",
+   :Year "1967",
+   :Album "Sgt. Pepper's Lonely Hearts Club Band",
+   :Artist "The Beatles",
+   :Genre "Rock",
+   :Subgenre "Psychedelic Rock"}}
+ {:doc-id 12,
+  :score 1.4528096,
+  :hit
+  {:Number "13",
+   :Year "1967",
+   :Album "The Velvet Underground & Nico",
+   :Artist "The Velvet Underground",
+   :Genre "Rock",
+   :Subgenre "Experimental"}}]
+
+#+end_src
 
 - OR Search
 Searching in a single field, where _any_ of the values in the /set/ are allowed
@@ -441,7 +478,7 @@ When looking for multiple terms in a single field, pass a /vector/.
 
 #+end_src
 
-Be sure that your queries are semantically right for the dataset. For example, /AND/-ing over two different years will lead to an empty result-set, obviously.
+Be sure that your queries are semantically right for the data-set. For example, /AND/-ing over two different years will lead to an empty result-set, obviously.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
 (lucene/search album-index {:Year ["1964" "1965"]})
 #+END_SRC
@@ -487,6 +524,7 @@ Spaces in the query string are inferred to mean a phrase search operation
    :Artist "Various",
    :Genre "& Country",
    :Subgenre "Rockabilly"}}]
+
 #+end_src
 
 - Searching across fields
@@ -572,6 +610,7 @@ We can ask for fuzzy matching when querying for suggestions.
 
 
 **** Or, do a fuzzy search
+Notice how /forever/ matches /fever/ too.
 #+BEGIN_SRC clojure :results output code m:tangle dev/dev.clj :exports both
 (lucene/search album-index {:Album "forever"}
                {:hit->doc #(ld/document->map % :multi-fields [:Genre :Subgenre])
