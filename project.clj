@@ -1,4 +1,4 @@
-(def lucene-version "8.6.3")
+(def lucene-version "8.7.0")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"

@@ -12,3 +12,7 @@ pom.xml.asc
 /.idea
 /*.iml
 /**/scratch.clj
+/.classpath
+/.project
+/.settings
+/docs

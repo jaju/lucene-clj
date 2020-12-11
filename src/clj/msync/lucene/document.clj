@@ -6,20 +6,20 @@
 (def suggest-field-prefix "$suggest-")
 
 (def ^:private index-options
-  {:full           IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
-   true            IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
+  {:full IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
+   true IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
 
-   :none           IndexOptions/NONE
-   :nil            IndexOptions/NONE
-   false           IndexOptions/NONE
+   :none IndexOptions/NONE
+   :nil IndexOptions/NONE
+   false IndexOptions/NONE
 
-   :docs-freqs     IndexOptions/DOCS_AND_FREQS
+   :docs-freqs IndexOptions/DOCS_AND_FREQS
    :docs-freqs-pos IndexOptions/DOCS_AND_FREQS_AND_POSITIONS})
 
 (defn- ^IndexableFieldType ->field-type
   "Each field's information is carried in its corresponding IndexableFieldType attribute. Internal detail."
   [{:keys [index-type store? tokenize?]
-    :or   {tokenize? true store? false}}]
+    :or {tokenize? true store? false}}]
   (let [opts (index-options index-type IndexOptions/NONE)]
     (doto (FieldType.)
       (.setIndexOptions opts)
@@ -66,41 +66,75 @@
    (apply vecs->maps ((juxt first rest) doc-vecs-with-header)))
   ([header-vec doc-vecs]
    (map zipmap (->> header-vec
-                    (map keyword)
-                    repeat)
-        doc-vecs)))
+                 (map keyword)
+                 repeat)
+     doc-vecs)))
 
 (defn map->document [m {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn]}]
   "Convert a map to a Lucene document.
   Lossy on the way back. Also, string field names come back as keywords."
-  (let [field-names           (keys m)
-        keyword-fields        (into #{} keyword-fields)
-        stored-fields         (into #{} (or stored-fields field-names))
-        suggest-fields        (reduce
-                                (fn [m e]
-                                  (if (and (sequential? e)
-                                           (= 2 (count e)))
-                                    (assoc m (first e) (second e))
-                                    (assoc m e 1)))
-                                {}
-                                suggest-fields)
-        indexed-fields        (zipmap (or indexed-fields field-names) (repeat :full))
-        field-creator         (fn [k v]
-                                (->field k v
-                                         {:index-type (get indexed-fields k :none)
-                                          :store?     (contains? stored-fields k)
-                                          :tokenize?  (-> k keyword-fields nil?)}))
-        context-fn            (or context-fn (constantly []))
-        contexts              (context-fn m)
+  (let [field-names (keys m)
+        keyword-fields (into #{} keyword-fields)
+        stored-fields (into #{} (or stored-fields field-names))
+        suggest-fields (reduce
+                         (fn [m e]
+                           (if (and (sequential? e)
+                                 (= 2 (count e)))
+                             (assoc m (first e) (second e))
+                             (assoc m e 1)))
+                         {}
+                         suggest-fields)
+        indexed-fields (zipmap (or indexed-fields field-names) (repeat :full))
+        field-creator (fn [k v]
+                        (->field k v
+                          {:index-type (get indexed-fields k :none)
+                           :store? (contains? stored-fields k)
+                           :tokenize? (-> k keyword-fields nil?)}))
+        context-fn (or context-fn (constantly []))
+        contexts (context-fn m)
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]
                                   (->suggest-field field-name value contexts weight)))
-        doc                   (Document.)]
+        doc (Document.)]
     (doseq [k field-names]
       (add-fields! doc k (get m k) field-creator))
     (doseq [[field-key weight] suggest-fields]
       (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
     doc))
+
+(defn fn:map->document [{:keys [field-names indexed-fields
+                                stored-fields keyword-fields
+                                suggest-fields context-fn]}]
+  "Convert a map to a Lucene document.
+  Lossy on the way back. Also, string field names come back as keywords."
+  (let [keyword-fields (into #{} keyword-fields)
+        stored-fields (into #{} (or stored-fields field-names))
+        suggest-fields (reduce
+                         (fn [m e]
+                           (if (and (sequential? e)
+                                 (= 2 (count e)))
+                             (assoc m (first e) (second e))
+                             (assoc m e 1)))
+                         {}
+                         suggest-fields)
+        indexed-fields (zipmap (or indexed-fields field-names) (repeat :full))
+        field-creator (fn [k v]
+                        (->field k v
+                          {:index-type (get indexed-fields k :none)
+                           :store? (contains? stored-fields k)
+                           :tokenize? (-> k keyword-fields nil?)}))
+        context-fn (or context-fn (constantly []))]
+    (fn [m]
+      (let [doc (Document.)
+            contexts (context-fn m)
+            suggest-field-creator (fn [[field-name weight] v]
+                                    (let [value v]
+                                      (->suggest-field field-name value contexts weight)))]
+        (doseq [k field-names]
+          (add-fields! doc k (get m k) field-creator))
+        (doseq [[field-key weight] suggest-fields]
+          (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
+        doc))))
 
 
 (defn document->map
@@ -111,7 +145,7 @@
   (let [fields-to-keep (if (nil? fields-to-keep)
                          (constantly true)
                          fields-to-keep)
-        multi-fields   (into #{} multi-fields)]
+        multi-fields (into #{} multi-fields)]
     (reduce
       (fn [m ^Field field]
         (let [[k v] (field->kv field)]
