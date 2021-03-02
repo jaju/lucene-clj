@@ -53,6 +53,7 @@
 
 
 
+
 (defonce album-data-analyzer
   (analyzers/per-field-analyzer default-analyzer
                                 {:Year     keyword-analyzer
