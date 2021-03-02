@@ -101,4 +101,3 @@
         doc-fn   (d/fn:map->document doc-opts)]
     (doseq [document (map doc-fn doc-maps)]
       (.addDocument iw document))))
-

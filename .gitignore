@@ -16,3 +16,7 @@ pom.xml.asc
 /.project
 /.settings
 /docs
+/.clj-kondo
+/.lsp
+/.projectile
+/**/#**#
