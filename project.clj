@@ -1,11 +1,11 @@
-(def lucene-version "8.8.1")
+(def lucene-version "8.9.0")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
   :url "https://github.com/jaju/lucene-clj"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.10.2"]
+  :dependencies [[org.clojure/clojure "1.10.3"]
                  [org.apache.lucene/lucene-core ~lucene-version]
                  [org.apache.lucene/lucene-queryparser ~lucene-version]
                  [org.apache.lucene/lucene-analyzers-common ~lucene-version]
