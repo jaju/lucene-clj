@@ -7,7 +7,7 @@
 
 * What is /lucene-clj/?                                             :version:
 
-A simple Clojure wrapper for Apache Lucene (version 8.8.1).
+A simple Clojure wrapper for Apache Lucene (version 8.9.0).
 
 Key usage scenarios
 - Search :: The core use-case of Lucene.
