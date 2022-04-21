@@ -1,14 +1,15 @@
-(def lucene-version "8.9.0")
+(def lucene-version "9.1.0")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
   :url "https://github.com/jaju/lucene-clj"
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.10.3"]
+  :dependencies [[org.clojure/clojure "1.11.1"]
                  [org.apache.lucene/lucene-core ~lucene-version]
                  [org.apache.lucene/lucene-queryparser ~lucene-version]
-                 [org.apache.lucene/lucene-analyzers-common ~lucene-version]
+                 [org.apache.lucene/lucene-analysis-common ~lucene-version]
+                 [org.apache.lucene/lucene-codecs ~lucene-version]
                  [org.apache.lucene/lucene-suggest ~lucene-version]]
   :implicits false
 
@@ -18,14 +19,15 @@
 
   :plugins [[lein-marginalia "0.9.1"]]
 
-  :profiles {:dev  {:dependencies [[org.clojure/data.csv "1.0.0"]
+  :profiles {:dev  {:dependencies [[org.clojure/data.csv "1.0.1"]
                                    [criterium "0.4.6"]]
                     :source-paths ["test" "dev"]
                     :resource-paths ["test-resources"]}
 
-             :test {:dependencies   [[org.clojure/data.csv "1.0.0"]]
+             :test {:dependencies   [[org.clojure/data.csv "1.0.1"]]
                     :resource-paths ["test-resources"]}
 
+             :1.10  {:dependencies [[org.clojure/clojure "1.10.3"]]}
              :1.9  {:dependencies [[org.clojure/clojure "1.9.0"]]}
              :1.8  {:dependencies [[org.clojure/clojure "1.8.0"]]}}
 
