@@ -7,7 +7,7 @@
            [org.apache.lucene.store FSDirectory Directory MMapDirectory]
            [java.io File]
            [org.apache.lucene.analysis Analyzer]
-           [org.apache.lucene.codecs.lucene91 Lucene91Codec]
+           [org.apache.lucene.codecs.lucene92 Lucene92Codec]
            [org.apache.lucene.search.suggest.document Completion90PostingsFormat]))
 
 (defrecord IndexConfig [directory analyzer])
@@ -18,7 +18,7 @@
   overridden."
   []
   (let [comp-postings-format (Completion90PostingsFormat.)]
-    (proxy [Lucene91Codec] []
+    (proxy [Lucene92Codec] []
       (getPostingsFormatForField [field-name]
         (if (.startsWith field-name d/suggest-field-prefix)
           comp-postings-format
