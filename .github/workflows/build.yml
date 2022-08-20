@@ -1,0 +1,7 @@
+name: Build and Test
+on: [push]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "🎉 We have the first job running!"
