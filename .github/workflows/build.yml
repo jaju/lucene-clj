@@ -1,0 +1,42 @@
+name: Build, Test
+
+on: [push]
+
+jobs:
+
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+
+    runs-on: ${{matrix.os}}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Java
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install Clojure Tools
+        uses: DeLaGuardo/setup-clojure@9.5
+        with:
+          lein: 2.9.10
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.m2/repository
+            ~/.deps.clj
+          key: deps-${{hashFiles('project.clj')}}
+          restore-keys: deps-
+
+      - name: Run Tests
+        run: lein test
+
+      - name: Prepare Uberjar
+        run: lein uberjar
