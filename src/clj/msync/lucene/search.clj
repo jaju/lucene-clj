@@ -15,13 +15,15 @@
         ^Query query            (if fuzzy?
                                   (query/combine-fuzzy-queries query-form)
                                   (query/parse query-form {:analyzer analyzer :field-name field-name}))
-        ^TopDocs hits           (.search searcher query (+ (* page results-per-page) results-per-page))
+        ^Integer num-hits       (+ (* page results-per-page) results-per-page)
+        ^TopDocs hits           (.search searcher query ^Integer num-hits)
         start                   (* page results-per-page)
         end                     (min (+ start results-per-page) (.value (.totalHits hits)))]
     (vec
       (for [^ScoreDoc hit (map (partial aget (.scoreDocs hits))
-                               (range start end))]
-        (let [doc-id (.doc hit)
-              doc    (.doc searcher doc-id)
-              score  (.score hit)]
+                            (range start end))]
+        (let [doc-id        (.doc hit)
+              stored-fields (.storedFields searcher)
+              doc           (.document stored-fields doc-id)
+              score         (.score hit)]
           {:doc-id doc-id :score score :hit (hit->doc doc)})))))
