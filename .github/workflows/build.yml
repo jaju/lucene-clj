@@ -13,7 +13,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4.1.1
 
       - name: Setup Java
         uses: actions/setup-java@v3
@@ -22,9 +22,9 @@ jobs:
           java-version: '17'
 
       - name: Install Clojure Tools
-        uses: DeLaGuardo/setup-clojure@9.5
+        uses: DeLaGuardo/setup-clojure@12.1
         with:
-          lein: 2.9.10
+          lein: 2.10.0
 
       - name: Cache dependencies
         uses: actions/cache@v3
