@@ -71,7 +71,7 @@ This is a pretty hand-wavy description, but useful enough for our purpose.
 
 Lucene consumes /documents/, each of which is made up of /fields/ having values. As is natural in Clojure, we represent all such things as /maps/.
 
-#+BEGIN_SRC clojure :results none :ns user
+#+BEGIN_SRC clojure :results none :ns user :session *clojure-nrepl*
   {
    :title-field "This is a title"
    :abstract-field "This is an abstract of what is to follow"
