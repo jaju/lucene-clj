@@ -1,4 +1,4 @@
-name: Build, Test
+name: Build, Testt
 
 on: [push]
 
@@ -19,12 +19,12 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '22'
 
       - name: Install Clojure Tools
-        uses: DeLaGuardo/setup-clojure@12.1
+        uses: DeLaGuardo/setup-clojure@12.5
         with:
-          lein: 2.10.0
+          lein: 2.11.2
 
       - name: Cache dependencies
         uses: actions/cache@v3
