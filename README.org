@@ -2,7 +2,7 @@
 #+PROPERTY: header-args :comments link
 #+PROPERTY: noweb: yes
 
-* org.msync/lucene-clj [[http://travis-ci.org/jaju/lucene-clj][file:https://secure.travis-ci.org/jaju/lucene-clj.png]]
+* org.msync/lucene-clj [[https://github.org/jaju/lucene-clj][file:https://github.com/jaju/lucene-clj/actions/workflows/clojure.yml/badge.svg]]
 
 
 * What is /lucene-clj/?                                             :version:
