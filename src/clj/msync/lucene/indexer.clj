@@ -4,11 +4,11 @@
              [utils :as utils]]
             [msync.lucene.document :as d])
   (:import [org.apache.lucene.index IndexWriter DirectoryReader IndexReader IndexWriterConfig]
-           [org.apache.lucene.store FSDirectory Directory MMapDirectory]
+           [org.apache.lucene.store FSDirectory Directory MMapDirectory ByteBuffersDirectory]
            [java.io File]
            [org.apache.lucene.analysis Analyzer]
-           [org.apache.lucene.codecs.lucene99 Lucene99Codec]
-           [org.apache.lucene.search.suggest.document Completion99PostingsFormat]))
+           [org.apache.lucene.codecs.lucene101 Lucene101Codec] ; Changed to 10.1
+           [org.apache.lucene.search.suggest.document Completion101PostingsFormat])) ; Changed to 10.1
 
 (defrecord IndexConfig [directory analyzer])
 
@@ -17,8 +17,8 @@
   Chooses the codec based on the field name prefix - which is fixed/pre-decided and not designed to be
   overridden."
   []
-  (let [comp-postings-format (Completion99PostingsFormat.)]
-    (proxy [Lucene99Codec] []
+  (let [comp-postings-format (Completion101PostingsFormat.)] ; Changed to 10.1
+    (proxy [Lucene101Codec] [] ; Changed to 10.1
       (getPostingsFormatForField [field-name]
         (if (.startsWith field-name d/suggest-field-prefix)
           comp-postings-format
@@ -44,14 +44,6 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn- ->index-config [directory analyzer]
   (->IndexConfig directory analyzer))
-
-(defn- ^Directory ->mmap-directory
-  "Lucene Directory for transient indexes"
-  []
-  (let [temp-path (utils/temp-path)
-        d         (MMapDirectory. temp-path)]
-    (utils/delete-on-exit! d)
-    d))
 
 (declare clear!)
 (defn- ^Directory ->disk-directory
@@ -79,7 +71,7 @@
   a string representing the path on disk where the index is created."
   [{:keys [type path analyzer re-create?]}]
   (let [directory (condp = type
-                    :memory (->mmap-directory)
+                    :memory (ByteBuffersDirectory.)
                     :disk (->disk-directory path (or re-create? false)))]
     (->index-config directory analyzer)))
 

@@ -32,7 +32,8 @@
     (vec
       (for [^ScoreDoc hit (.scoreDocs hits)]
         (let [doc-id (.doc hit)
-              doc    (.doc suggester doc-id)
+              stored-fields (.storedFields suggester)
+              doc    (.document stored-fields ^int doc-id) ; Use storedFields.document(int)
               score  (.score hit)]
           {:hit (hit->doc doc) :score score :doc-id doc-id})))))
 

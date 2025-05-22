@@ -1,4 +1,4 @@
-(def lucene-version "9.11.1")
+(def lucene-version "10.2.1")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
@@ -26,6 +26,7 @@
                     :resource-paths ["test-resources"]}
 
              :test {:dependencies   [[org.clojure/data.csv "1.1.0"]]
+                    :source-paths ["test"]
                     :resource-paths ["test-resources"]}
 
              :1.10  {:dependencies [[org.clojure/clojure "1.10.3"]]}}
