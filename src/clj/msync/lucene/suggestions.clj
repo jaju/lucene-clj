@@ -1,7 +1,9 @@
 (ns msync.lucene.suggestions
   (:require [msync.lucene.document :as d]
             [msync.lucene.indexer :as indexer]
-            [msync.lucene.utils :refer [!nil?]])
+            [msync.lucene
+             [validation :as validation]
+             [values :as values]])
   (:import [org.apache.lucene.search ScoreDoc]
            [org.apache.lucene.search.suggest.document
             TopSuggestDocs SuggestIndexSearcher ContextQuery
@@ -14,8 +16,9 @@
                  ^String prefix-query
                  {:keys [contexts analyzer max-results hit->doc fuzzy? skip-duplicates?]
                   :or   {fuzzy? false skip-duplicates? false hit->doc identity}}]
-  {:pre [(!nil? analyzer) (!nil? max-results)]}
-  (let [suggest-field        (str d/suggest-field-prefix field-name)
+  {:pre [(some? analyzer) (some? max-results)]}
+  (let [prefix-query         (values/-normalize-text-value field-name prefix-query)
+        suggest-field        (str d/suggest-field-prefix field-name)
         term                 (Term. suggest-field prefix-query)
         pcq                  (if fuzzy?
                                (FuzzyCompletionQuery. analyzer term)
@@ -27,7 +30,7 @@
                                  q)
                                pcq)
         suggester            (SuggestIndexSearcher. index)
-        num-hits             (min 10 max-results)
+        num-hits             max-results
         ^TopSuggestDocs hits (.suggest suggester cq num-hits skip-duplicates?)]
     (vec
       (for [^ScoreDoc hit (.scoreDocs hits)]
@@ -44,6 +47,7 @@
               :skip-duplicates? (or skip-duplicates? false)
               :max-results      (or max-results 10)
               :hit->doc         (or hit->doc identity)
-              :contexts         contexts
+              :contexts         (values/-normalize-optional-text-values :suggest-contexts contexts)
               :analyzer         analyzer}]
+    (validation/-validate-suggest-opts field-name prefix-query opts)
     (suggest* index-reader (name field-name) prefix-query opts)))

@@ -71,12 +71,19 @@
        (.setAutoGeneratePhraseQueries true))
      (.parse qp dsl))))
 
-(defn create-fuzzy-query [fld ^String val]
+(defn -create-fuzzy-query
+  "Build a fuzzy Lucene query for a single field/value pair."
+  [fld ^String val]
   (let [term (Term. ^String (name fld) val)]
     (FuzzyQuery. term)))
 
-(defn combine-fuzzy-queries [m]
+(defn -combine-fuzzy-queries
+  "Combine a field-to-term map into a SHOULD-based fuzzy query."
+  [m]
   (let [b (BooleanQuery$Builder.)]
     (doseq [[k v] m]
-      (.add b (create-fuzzy-query k v) BooleanClause$Occur/SHOULD))
+      (.add b (-create-fuzzy-query k v) BooleanClause$Occur/SHOULD))
     (.build b)))
+
+(def create-fuzzy-query -create-fuzzy-query)
+(def combine-fuzzy-queries -combine-fuzzy-queries)

@@ -1,4 +1,5 @@
 (ns msync.lucene.document
+  (:require [msync.lucene.values :as values])
   (:import [org.apache.lucene.index IndexOptions IndexableFieldType]
            [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
            [org.apache.lucene.document FieldType Field Document]))
@@ -31,10 +32,10 @@
 
 (defn- ^Field ->field
   "Document Field.
-  TBD: Support values other than as strings. Currently, everything is converted to a string."
+  Accepts a pre-normalized string value."
   [k ^String v opts]
   {:pre [(reserved-name? k)]}
-  (Field. (name k) (name v) (->field-type opts)))
+  (Field. (name k) v (->field-type opts)))
 
 (defn- ^SuggestField ->suggest-field
   "Document SuggestField"
@@ -46,17 +47,12 @@
 
 (defn- add-fields!
   [document field-name field-values field-creator]
-  (let [field-values (if (sequential? field-values) field-values [field-values])]
-    (doseq [field-value field-values]
-      (.add document (field-creator field-name field-value)))))
+  (doseq [field-value field-values]
+    (.add document (field-creator field-name field-value))))
 
 (defn- field->kv [^Field f]
   [(-> f .name keyword) (.stringValue f)])
 
-(defn- assoc-conj [m k v]
-  (assoc m k (conj (m k []) v)))
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (defn vecs->maps
   "Collection of vectors, with the first considered the header.
   [[field1 field2] [f11 f12] [f21 f22]] =>
@@ -100,15 +96,17 @@
                            :store? (contains? stored-fields k)
                            :tokenize? (-> k keyword-fields nil?)}))
         context-fn (or context-fn (constantly []))
-        contexts (context-fn m)
+        contexts (values/-normalize-optional-text-values :suggest-contexts (context-fn m))
         suggest-field-creator (fn [[field-name weight] v]
                                 (let [value v]
                                   (->suggest-field field-name value contexts weight)))
         doc (Document.)]
     (doseq [k field-names]
-      (add-fields! doc k (get m k) field-creator))
+      (add-fields! doc k (values/-normalize-text-values k (get m k)) field-creator))
     (doseq [[field-key weight] suggest-fields]
-      (add-fields! doc [field-key weight] (get m field-key) suggest-field-creator))
+      (add-fields! doc [field-key weight]
+                   (values/-normalize-text-values field-key (get m field-key))
+                   suggest-field-creator))
     doc))
 
 (defn document->map
@@ -125,16 +123,24 @@
         (let [[k v] (field->kv field)]
           (if (fields-to-keep k)
             (if (multi-fields k)
-              (assoc-conj m k v)
+              (update m k (fnil conj []) v)
               (assoc m k v))
             m)))
       {}
       document)))
 
-(defn fn:map->document [doc-opts]
+(defn -map->document-fn
+  "Build a document encoder function for the supplied indexing options."
+  [doc-opts]
   (fn [doc-map]
     (map->document doc-map doc-opts)))
 
-(defn fn:document->map [& opt-args]
+(def fn:map->document -map->document-fn)
+
+(defn -document->map-fn
+  "Build a document decoder function for the supplied projection options."
+  [& opt-args]
   (fn [doc]
     (apply document->map doc opt-args)))
+
+(def fn:document->map -document->map-fn)

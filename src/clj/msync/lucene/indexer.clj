@@ -1,7 +1,8 @@
 (ns msync.lucene.indexer
   (:require [clojure.java.io :as io]
             [msync.lucene
-             [utils :as utils]]
+             [utils :as utils]
+             [validation :as validation]]
             [msync.lucene.document :as d])
   (:import [org.apache.lucene.index IndexWriter DirectoryReader IndexReader IndexWriterConfig]
            [org.apache.lucene.store FSDirectory Directory MMapDirectory]
@@ -77,7 +78,8 @@
 (defn ^IndexConfig create!
   "Create an appropriate index - where path is either the keyword :memory, or
   a string representing the path on disk where the index is created."
-  [{:keys [type path analyzer re-create?]}]
+  [{:keys [type path analyzer re-create?] :as opts}]
+  (validation/-validate-create-opts opts)
   (let [directory (condp = type
                     :memory (->mmap-directory)
                     :disk (->disk-directory path (or re-create? false)))]
@@ -97,7 +99,7 @@
   [^IndexWriter iw
    doc-maps
    {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn] :as doc-opts}]
-  (let [doc-maps (if (map? doc-maps) [doc-maps] doc-maps)
-        doc-fn   (d/fn:map->document doc-opts)]
+  (let [doc-maps (validation/-normalize-document-maps doc-maps)
+        doc-fn   (d/-map->document-fn doc-opts)]
     (doseq [document (map doc-fn doc-maps)]
       (.addDocument iw document))))

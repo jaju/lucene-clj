@@ -1,6 +1,7 @@
 ;; [[file:../../../README.org::*Some Background - Data Preparation][Some Background - Data Preparation:2]]
 (ns msync.lucene.tests-common
-  (:require [msync.lucene
+  (:require [msync.lucene :as lucene]
+            [msync.lucene
              [analyzers :as analyzers]
              [document :as ld]]
             [clojure.data.csv :as csv]
@@ -60,3 +61,34 @@
                                  :Genre    keyword-analyzer
                                  :Subgenre keyword-analyzer}))
 ;; Creating Analyzers:1 ends here
+
+(def sample-index-fields
+  #{:first-name :last-name :age :real :gender :bio})
+
+(def sample-suggest-fields
+  {:first-name 1})
+
+(def sample-keyword-fields
+  #{:age})
+
+(def suggestion-context-fields
+  [:real])
+
+(defn sample-contexts
+  "Derive suggestion contexts for the sample dataset."
+  [doc-map]
+  (->> (select-keys doc-map suggestion-context-fields)
+       vals
+       (map s/lower-case)))
+
+(defn create-sample-store
+  "Create and populate the in-memory sample index used by semantic API tests."
+  []
+  (let [store (lucene/create-index! :type :memory :analyzer default-analyzer)]
+    (lucene/index! store sample-data
+                   {:indexed-fields sample-index-fields
+                    :suggest-fields sample-suggest-fields
+                    :context-fn     sample-contexts
+                    :stored-fields  sample-index-fields
+                    :keyword-fields sample-keyword-fields})
+    store))

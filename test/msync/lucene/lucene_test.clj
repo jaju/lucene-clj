@@ -2,32 +2,14 @@
   (:require [clojure.test :refer :all]
             [msync.lucene.tests-common :refer :all]
             [msync.lucene :as lucene]
-            [msync.lucene.indexer :as indexer]
-            [clojure.string :as string]
             [msync.lucene.query :as query]
-            [msync.lucene.analyzers :as a]
-            [criterium.core :refer [bench]]))
+            [msync.lucene.analyzers :as a]))
 
 (def store')
-(defonce analyzer (a/standard-analyzer))
-(defonce suggestion-context-fields [:real])
-(defn context-fn [doc-map]
-  (->> (select-keys doc-map suggestion-context-fields)
-       vals
-       (map string/lower-case)))
+(defonce analyzer default-analyzer)
 
 
-(let [data           sample-data
-      fields         #{:first-name :last-name :age :real :gender :bio}
-      suggest-fields {:first-name 1}
-      keyword-fields #{:age}
-      store          (lucene/create-index! :type :memory :analyzer analyzer)
-      _              (lucene/index! store data
-                                    {:indexed-fields fields
-                                     :suggest-fields suggest-fields
-                                     :context-fn     context-fn
-                                     :stored-fields  fields
-                                     :keyword-fields keyword-fields})
+(let [store          (create-sample-store)
       directory      (:directory store)]
 
   ;; This is to hold onto the index when created during REPL-driven development, and this buffer is eval'ed.

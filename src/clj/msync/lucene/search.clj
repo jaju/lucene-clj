@@ -1,5 +1,8 @@
 (ns msync.lucene.search
-  (:require [msync.lucene.query :as query])
+  (:require [msync.lucene
+             [query :as query]
+             [validation :as validation]
+             [values :as values]])
   (:import [org.apache.lucene.search ScoreDoc TopDocs Query IndexSearcher]
            [org.apache.lucene.index IndexReader]))
 
@@ -10,10 +13,18 @@
                       page             0
                       hit->doc         identity
                       fuzzy?           false}}]
-  (let [^IndexSearcher searcher (IndexSearcher. index-store)
+  (validation/-validate-search-opts query-form
+                                    {:field-name field-name
+                                     :results-per-page results-per-page
+                                     :analyzer analyzer
+                                     :hit->doc hit->doc
+                                     :page page
+                                     :fuzzy? fuzzy?})
+  (let [query-form              (values/-normalize-query-form query-form)
+        ^IndexSearcher searcher (IndexSearcher. index-store)
         field-name              (if field-name (name field-name))
         ^Query query            (if fuzzy?
-                                  (query/combine-fuzzy-queries query-form)
+                                  (query/-combine-fuzzy-queries query-form)
                                   (query/parse query-form {:analyzer analyzer :field-name field-name}))
         ^Integer num-hits       (+ (* page results-per-page) results-per-page)
         ^TopDocs hits           (.search searcher query ^Integer num-hits)
