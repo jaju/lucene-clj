@@ -53,6 +53,40 @@ The objectives are loosely as follows.
 
 I am thankful to the above library authors for their liberal licensing. I've used their ideas/code in places.
 
+* Vision
+
+/lucene-clj/ is an opinionated embedded retrieval library for Clojure applications.
+
+It is not trying to wrap all of Lucene. Instead, it focuses on a narrow slice of Lucene that is especially valuable for application search and agentic workflows:
+
+- map-first document indexing
+- analyzer composition
+- ergonomic lexical retrieval
+- suggestions and completion
+- explainable ranking
+- future vector and hybrid retrieval
+
+The design principle is to keep the human-facing API compact and idiomatic. Where possible, Clojure data shapes carry query intent instead of multiplying API entry points.
+
+For retrieval strategy, the intended order of importance is:
+
+- BM25-style lexical retrieval as the primary baseline
+- optional classic TF-IDF-style scoring when comparison or compatibility is useful
+- vector retrieval as a complement, not a replacement, for lexical retrieval
+- hybrid retrieval when both lexical precision and semantic recall matter
+
+** Deliberately Out Of Scope
+
+At least for now, /lucene-clj/ is not trying to be:
+
+- a complete wrapper over all Lucene modules
+- a distributed search system
+- a replacement for Solr, Elasticsearch, or OpenSearch
+- a schema-heavy document database
+- a host for every Lucene storage, codec, faceting, spatial, or analytics feature
+- a direct exposure of low-level Lucene internals when a smaller Clojure abstraction is sufficient
+
+This focus is intentional. Lucene is vast; /lucene-clj/ aims to be small, opinionated, and excellent at embedded retrieval rather than broad and thin.
 
 * Usage - A Complete Scenario
 
@@ -470,7 +504,10 @@ Searching in a single field, for a single value
 #+end_src
 
 **** Fielded string search
-When the query form is a plain string, pass ~:field-name~. Strings containing spaces are treated as phrase queries.
+When the query form is a plain string, pass ~:field-name~.
+- A single word becomes a term query.
+- A string containing spaces becomes a phrase query.
+
 #+BEGIN_SRC clojure :tangle no :results none :exports both
 (lucene/search album-index "the sun"
                {:field-name :Album
@@ -705,6 +742,31 @@ Notice how /forever/ matches /fever/ too.
 
 #+end_src
 
+**** Query shape cheat sheet
+
+/lucene-clj/ leans on Clojure data shapes so that one ~search~ function can cover the common query kinds.
+
+- ~{:field "value"}~ :: fielded search
+- ~{:field ["a" "b"]}~ :: AND within one field
+- ~{:field #{"a" "b"}}~ :: OR within one field
+- ~"single term"~ with ~:field-name~ :: single-field term search
+- ~"multiple words"~ with ~:field-name~ :: phrase search
+- ~Query~ from ~msync.lucene.query/parse-dsl~ :: explicit Lucene query syntax
+
+Examples:
+
+#+BEGIN_SRC clojure :tangle no :results none
+(lucene/search album-index {:Album "rumours"})
+(lucene/search album-index {:Album ["complete" "unbelievable"]})
+(lucene/search album-index {:Year #{"1960" "1965"}})
+(lucene/search album-index "the sun" {:field-name :Album})
+(lucene/search album-index
+               (msync.lucene.query/parse-dsl "Album:\"the sun\" AND Year:1976"
+                                             common/album-data-analyzer))
+#+END_SRC
+
+This API is intentionally shape-driven: the kind of Clojure value you pass determines the query behavior. That keeps the public surface compact, but it also means that changing a query from a set to a vector, or from a single word to a spaced string, changes the semantics.
+`
 
 * Additional notes
 - Some minimal technical overview of Lucene internals for this project can be found [[file:doc/LuceneNotes.org][here]].
