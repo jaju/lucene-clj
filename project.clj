@@ -1,6 +1,7 @@
 (def lucene-version "10.4.0")
 (def matcher-combinators-version "3.9.2")
 (def test-check-version "1.1.3")
+(def kaocha-version "1.91.1392")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
@@ -25,7 +26,8 @@
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "1.1.0"]
                                    [criterium "0.4.6"]
                                    [nubank/matcher-combinators ~matcher-combinators-version]
-                                   [org.clojure/test.check ~test-check-version]]
+                                   [org.clojure/test.check ~test-check-version]
+                                   [lambdaisland/kaocha ~kaocha-version]]
                     :source-paths ["test" "dev"]
                     :resource-paths ["test-resources"]}
 
@@ -35,6 +37,8 @@
                     :resource-paths ["test-resources"]}
 
              :1.10  {:dependencies [[org.clojure/clojure "1.10.3"]]}}
+
+  :aliases {"kaocha" ["run" "-m" "kaocha.runner"]}
 
   :deploy-repositories [["releases" :clojars]
                         ["snapshots" :clojars]])
