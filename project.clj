@@ -1,5 +1,6 @@
 (def lucene-version "10.4.0")
 (def matcher-combinators-version "3.9.2")
+(def test-check-version "1.1.3")
 
 (defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
@@ -23,12 +24,14 @@
 
   :profiles {:dev  {:dependencies [[org.clojure/data.csv "1.1.0"]
                                    [criterium "0.4.6"]
-                                   [nubank/matcher-combinators ~matcher-combinators-version]]
+                                   [nubank/matcher-combinators ~matcher-combinators-version]
+                                   [org.clojure/test.check ~test-check-version]]
                     :source-paths ["test" "dev"]
                     :resource-paths ["test-resources"]}
 
              :test {:dependencies   [[org.clojure/data.csv "1.1.0"]
-                                     [nubank/matcher-combinators ~matcher-combinators-version]]
+                                     [nubank/matcher-combinators ~matcher-combinators-version]
+                                     [org.clojure/test.check ~test-check-version]]
                     :resource-paths ["test-resources"]}
 
              :1.10  {:dependencies [[org.clojure/clojure "1.10.3"]]}}
