@@ -7,8 +7,8 @@
            [org.apache.lucene.store FSDirectory Directory MMapDirectory]
            [java.io File]
            [org.apache.lucene.analysis Analyzer]
-           [org.apache.lucene.codecs.lucene99 Lucene99Codec]
-           [org.apache.lucene.search.suggest.document Completion99PostingsFormat]))
+           [org.apache.lucene.codecs.lucene104 Lucene104Codec]
+           [org.apache.lucene.search.suggest.document Completion104PostingsFormat]))
 
 (defrecord IndexConfig [directory analyzer])
 
@@ -17,8 +17,8 @@
   Chooses the codec based on the field name prefix - which is fixed/pre-decided and not designed to be
   overridden."
   []
-  (let [comp-postings-format (Completion99PostingsFormat.)]
-    (proxy [Lucene99Codec] []
+  (let [comp-postings-format (Completion104PostingsFormat.)]
+    (proxy [Lucene104Codec] []
       (getPostingsFormatForField [field-name]
         (if (.startsWith field-name d/suggest-field-prefix)
           comp-postings-format

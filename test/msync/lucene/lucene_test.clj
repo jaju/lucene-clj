@@ -23,7 +23,7 @@
       keyword-fields #{:age}
       store          (lucene/create-index! :type :memory :analyzer analyzer)
       _              (lucene/index! store data
-                                    {:fields         fields
+                                    {:indexed-fields fields
                                      :suggest-fields suggest-fields
                                      :context-fn     context-fn
                                      :stored-fields  fields
@@ -100,10 +100,9 @@
 
   (deftest paginated-results
     (let [query       {:bio #{"love" "enjoy"}}
-          max-results 10
-          page-0      (lucene/search store query {:max-results max-results :page 0 :results-per-page 2})
-          page-1      (lucene/search store query {:max-results max-results :page 1 :results-per-page 2})
-          page-2      (lucene/search store query {:max-results max-results :page 2 :results-per-page 2})]
+          page-0      (lucene/search store query {:page 0 :results-per-page 2})
+          page-1      (lucene/search store query {:page 1 :results-per-page 2})
+          page-2      (lucene/search store query {:page 2 :results-per-page 2})]
       (testing "Fetching from a large (ahem!) repository, one page at a time"
         (is (= 2 (count page-0)))
         (is (= 2 (count page-1)))

@@ -2,18 +2,21 @@
 #+PROPERTY: header-args :comments link
 #+PROPERTY: noweb: yes
 
-* org.msync/lucene-clj [[https://github.org/jaju/lucene-clj][file:https://github.com/jaju/lucene-clj/actions/workflows/clojure.yml/badge.svg]]
+* org.msync/lucene-clj [[https://github.com/jaju/lucene-clj][file:https://github.com/jaju/lucene-clj/actions/workflows/clojure.yml/badge.svg]]
 
 
 * What is /lucene-clj/?                                             :version:
 
-A simple Clojure wrapper for Apache Lucene (version 8.9.0).
+A simple Clojure wrapper for Apache Lucene, currently targeting Lucene 10.4.0.
 
 Key usage scenarios
 - Search :: The core use-case of Lucene.
 - Suggest :: Prefix-queries for content in any field.
+- Query flexibility :: Search supports fielded maps, OR via sets, AND via vectors/sequences, plain strings, and classic Lucene query syntax.
+- Analyzer composition :: Convenience helpers exist for standard, keyword, simple, and per-field analyzers.
 
 Both in-memory, and on-disk indexes can be used depending on the dataset size.
+Disk indexes can also be rebuilt in place with ~:re-create? true~.
 
 Note: *UNSTABLE* API. No releases yet.
 
@@ -28,6 +31,11 @@ Notably
     [org.msync/lucene-clj "0.2.0-SNAPSHOT"]
 #+END_SRC
 Available via [[https://clojars.org/search?q=lucene-clj][clojars]].
+
+Current development baseline:
+- Clojure 1.12.4
+- Apache Lucene 10.4.0
+- Java 21 or newer
 
 
 * Why Would You Want to Use /lucene-clj/?
@@ -233,6 +241,14 @@ Or, on disk
                                            :analyzer common/album-data-analyzer))
 #+END_SRC
 
+If you want to rebuild an existing on-disk index from scratch, pass ~:re-create? true~.
+#+BEGIN_SRC clojure :tangle no :results none
+(defonce album-index (lucene/create-index! :type :disk
+                                           :path "/path/to/index/directory"
+                                           :analyzer common/album-data-analyzer
+                                           :re-create? true))
+#+END_SRC
+
 A sample of the album data for reference.
 The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and split further.
 #+BEGIN_SRC clojure :tangle no :results output code :exports both
@@ -265,9 +281,11 @@ The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and sp
 
 *** Index documents
 Documents are /Clojure maps/. Each /key-value/ in the map represents one ~org.apache.lucene.document.Field~. The options passed to the `index!` function control behavior in various ways
-- ~:stored-fields~ - Lucene can index for efficient searching, but to save space, it need not store all the field values. If you want Lucene to also store the contents, pass them as a collection to this argument. The alternative is to use Lucene to index without storing large fields, and 
-- ~:suggest-fields~ - Fields that are treated specially during indexing, allowing Lucene to create internal structures for quick prefix matching.
-- ~:context-fn~ - Lucene allows for a list of contexts to associate with the /suggest/ fields, which allow us to filter on them while querying for suggestions.
+- ~:indexed-fields~ - Explicitly choose which fields participate in full-text indexing. If omitted, all fields are indexed.
+- ~:stored-fields~ - Lucene can index for efficient searching, but to save space, it need not store all the field values. If you want Lucene to also store the contents, pass them as a collection to this argument.
+- ~:keyword-fields~ - Fields that should be treated verbatim rather than tokenized.
+- ~:suggest-fields~ - Fields that are treated specially during indexing, allowing Lucene to create internal structures for quick prefix matching. This can be a list of field names, or ~[field-name weight]~ pairs.
+- ~:context-fn~ - A keyword or function used to derive a list of contexts for /suggest/ fields, allowing suggestions to be filtered at query time.
 
 In the following, we instruct the `index!` function to 
 - Store the mentioned fields
@@ -278,6 +296,16 @@ In the following, we instruct the `index!` function to
                  {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
                   :suggest-fields [:Album :Artist]
                   :context-fn     :Genre})
+#+END_SRC
+
+Weighted suggestions are also supported:
+#+BEGIN_SRC clojure :tangle no :results none
+(lucene/index! album-index common/album-data
+               {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
+                :indexed-fields [:Album :Artist :Genre :Subgenre :Year]
+                :keyword-fields [:Year :Genre :Subgenre]
+                :suggest-fields [[:Album 5] :Artist]
+                :context-fn     (fn [doc] (:Genre doc))})
 #+END_SRC
 
 
@@ -304,7 +332,7 @@ The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ wh
 #+end_src
 
 
-For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map. But use beyond basic use-cases, supply your own.
+For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map. It supports both ~:multi-fields~ and ~:fields-to-keep~ to shape the result. But beyond basic use-cases, supply your own.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/search album-index {:Year "1977"}
                {:results-per-page 2
@@ -400,6 +428,15 @@ Paginated query results are supported via the /:page/ option. Also, the followin
 
 #+end_src
 
+The same projection can be expressed with ~ld/document->map~ directly by using ~:fields-to-keep~.
+#+BEGIN_SRC clojure :tangle no :results none
+(lucene/search album-index
+               {:Year "1968"}
+               {:results-per-page 5
+                :page 2
+                :hit->doc #(ld/document->map % :fields-to-keep #{:Year :Album})})
+#+END_SRC
+
 
 *** Search variations
 
@@ -431,6 +468,23 @@ Searching in a single field, for a single value
    :Subgenre "Experimental"}}]
 
 #+end_src
+
+**** Fielded string search
+When the query form is a plain string, pass ~:field-name~. Strings containing spaces are treated as phrase queries.
+#+BEGIN_SRC clojure :tangle no :results none :exports both
+(lucene/search album-index "the sun"
+               {:field-name :Album
+                :hit->doc ld/document->map})
+#+END_SRC
+
+**** Classic Lucene query syntax
+For Lucene's query parser syntax, parse the DSL explicitly and pass the resulting ~Query~ object to ~lucene/search~.
+#+BEGIN_SRC clojure :tangle no :results none :exports both
+(lucene/search album-index
+               (msync.lucene.query/parse-dsl "Album:\"the sun\" AND Year:1976"
+                                             common/album-data-analyzer)
+               {:hit->doc ld/document->map})
+#+END_SRC
 
 **** OR Search
 Searching in a single field, where _any_ of the values in the /set/ are allowed
@@ -558,7 +612,7 @@ This is an /AND/ operation
 Notice that in the /suggest/ function call, the field and suggestion-prefix are *not* passed as a map, as unlike search, suggest calls are only supported over a single field.
 
 **** Suggestions support for fields passed via ~:suggest-fields~
-From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a way so that we can ask for prefix-based suggestions.
+From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a way so that we can ask for prefix-based suggestions. During indexing, ~:suggest-fields~ can be a simple field name or a weighted ~[field-name weight]~ pair.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/suggest album-index :Album "par"
@@ -579,6 +633,14 @@ From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a 
   :doc-id 139}]
 
 #+end_src
+
+Use ~:max-results~ to cap the number of suggestions returned, and ~:skip-duplicates? true~ when duplicate suggestions are not useful for the caller.
+#+BEGIN_SRC clojure :tangle no :results none :exports both
+(lucene/suggest album-index :Album "s"
+                {:max-results 2
+                 :skip-duplicates? true
+                 :hit->doc #(ld/document->map % :fields-to-keep #{:Album :Artist})})
+#+END_SRC
 
 We can ask for fuzzy matching when querying for suggestions.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
