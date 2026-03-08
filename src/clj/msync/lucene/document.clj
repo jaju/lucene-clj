@@ -25,30 +25,39 @@
     (doto (FieldType.)
       (.setIndexOptions index-options)
       (.setStored store?)
-      (.setTokenized tokenize?))))
+      (.setTokenized tokenize?)
+      (.freeze))))
 
 (defn- reserved-name? [field-name]
   (not (.startsWith (name field-name) suggest-field-prefix)))
 
-(defn- ^Field ->field
-  "Document Field.
-  Accepts a pre-normalized string value."
-  [k ^String v opts]
-  {:pre [(reserved-name? k)]}
-  (Field. (name k) v (->field-type opts)))
+(defn- ->field-factory
+  "Build a reusable Lucene field constructor for a logical field."
+  [field-name opts]
+  {:pre [(reserved-name? field-name)]}
+  (let [field-name (name field-name)
+        field-type (->field-type opts)]
+    (fn [^String value]
+      (Field. field-name value field-type))))
 
-(defn- ^SuggestField ->suggest-field
-  "Document SuggestField"
-  [key ^String value contexts weight]
-  (let [key (str suggest-field-prefix (name key))]
-    (if (empty? contexts)
-      (SuggestField. key value weight)
-      (ContextSuggestField. key value weight (into-array String contexts)))))
+(defn- ->suggest-field-factory
+  "Build a reusable suggestion field constructor for a logical field."
+  [field-name weight]
+  (let [suggest-field-name (str suggest-field-prefix (name field-name))]
+    (fn [^String value contexts]
+      (if (empty? contexts)
+        (SuggestField. suggest-field-name value weight)
+        (ContextSuggestField. suggest-field-name value weight (into-array String contexts))))))
 
 (defn- add-fields!
-  [document field-name field-values field-creator]
+  [document field-values field-factory]
   (doseq [field-value field-values]
-    (.add document (field-creator field-name field-value))))
+    (.add document (field-factory field-value))))
+
+(defn- add-suggest-fields!
+  [document field-values contexts suggest-field-factory]
+  (doseq [field-value field-values]
+    (.add document (suggest-field-factory field-value contexts))))
 
 (defn- field->kv [^Field f]
   [(-> f .name keyword) (.stringValue f)])
@@ -67,6 +76,60 @@
        repeat)
      doc-vecs)))
 
+(defn- normalize-suggest-fields
+  [suggest-fields]
+  (reduce
+    (fn [weights entry]
+      (if (and (sequential? entry)
+               (= 2 (count entry)))
+        (assoc weights (first entry) (second entry))
+        (assoc weights entry 1)))
+    {}
+    suggest-fields))
+
+(defn- compile-document-options
+  "Compile document options into reusable field and suggestion constructors."
+  [{:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn]}]
+  (let [indexed-fields              (when indexed-fields
+                                      (zipmap indexed-fields (repeat :full)))
+        stored-fields               (when stored-fields
+                                      (into #{} stored-fields))
+        keyword-fields              (into #{} keyword-fields)
+        suggest-field-weights       (normalize-suggest-fields suggest-fields)
+        field-options-for           (fn [field-name]
+                                      {:index-type (if indexed-fields
+                                                     (get indexed-fields field-name :none)
+                                                     :full)
+                                       :store?     (if stored-fields
+                                                     (contains? stored-fields field-name)
+                                                     true)
+                                       :tokenize?  (not (contains? keyword-fields field-name))})
+        field-factory-for           (memoize
+                                      (fn [field-name]
+                                        (->field-factory field-name
+                                                         (field-options-for field-name))))
+        suggest-field-factory-for   (into {}
+                                          (map (fn [[field-name weight]]
+                                                 [field-name
+                                                  (->suggest-field-factory field-name weight)]))
+                                          suggest-field-weights)]
+    {:field-factory-for         field-factory-for
+     :suggest-field-factory-for suggest-field-factory-for
+     :contexts-fn               (or context-fn (constantly []))}))
+
+(defn- encode-document
+  "Encode a normalized Clojure document map as a Lucene document using compiled options."
+  [doc-map {:keys [field-factory-for suggest-field-factory-for contexts-fn]}]
+  (let [contexts (values/-normalize-optional-text-values :suggest-contexts
+                                                         (contexts-fn doc-map))
+        doc      (Document.)]
+    (doseq [[field-name raw-value] doc-map]
+      (let [field-values (values/-normalize-text-values field-name raw-value)]
+        (add-fields! doc field-values (field-factory-for field-name))
+        (when-let [suggest-field-factory (get suggest-field-factory-for field-name)]
+          (add-suggest-fields! doc field-values contexts suggest-field-factory))))
+    doc))
+
 (defn map->document
   "Convert a map to a Lucene document.
   Lossy on the way back. Also, string field names come back as keywords.
@@ -77,37 +140,8 @@
   suggest-fields => fields that support suggestion-querying. This is a list consisting of a mix of field-names and [field-name weight]
                     Default weight is 1
   context-fn => a function that takes the input map and returns a list of contexts. (This needs more explanation)"
-  [m {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn]}]
-  (let [field-names (keys m)
-        keyword-fields (into #{} keyword-fields)
-        stored-fields (into #{} (or stored-fields field-names))
-        suggest-fields (reduce
-                         (fn [m e]
-                           (if (and (sequential? e)
-                                 (= 2 (count e)))
-                             (assoc m (first e) (second e))
-                             (assoc m e 1)))
-                         {}
-                         suggest-fields)
-        indexed-fields (zipmap (or indexed-fields field-names) (repeat :full))
-        field-creator (fn [k v]
-                        (->field k v
-                          {:index-type (get indexed-fields k :none)
-                           :store? (contains? stored-fields k)
-                           :tokenize? (-> k keyword-fields nil?)}))
-        context-fn (or context-fn (constantly []))
-        contexts (values/-normalize-optional-text-values :suggest-contexts (context-fn m))
-        suggest-field-creator (fn [[field-name weight] v]
-                                (let [value v]
-                                  (->suggest-field field-name value contexts weight)))
-        doc (Document.)]
-    (doseq [k field-names]
-      (add-fields! doc k (values/-normalize-text-values k (get m k)) field-creator))
-    (doseq [[field-key weight] suggest-fields]
-      (add-fields! doc [field-key weight]
-                   (values/-normalize-text-values field-key (get m field-key))
-                   suggest-field-creator))
-    doc))
+  [m doc-opts]
+  (encode-document m (compile-document-options doc-opts)))
 
 (defn document->map
   "Convenience function.
@@ -132,8 +166,9 @@
 (defn -map->document-fn
   "Build a document encoder function for the supplied indexing options."
   [doc-opts]
-  (fn [doc-map]
-    (map->document doc-map doc-opts)))
+  (let [compiled-options (compile-document-options doc-opts)]
+    (fn [doc-map]
+      (encode-document doc-map compiled-options))))
 
 (def fn:map->document -map->document-fn)
 

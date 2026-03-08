@@ -101,5 +101,6 @@
    {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn] :as doc-opts}]
   (let [doc-maps (validation/-normalize-document-maps doc-maps)
         doc-fn   (d/-map->document-fn doc-opts)]
-    (doseq [document (map doc-fn doc-maps)]
-      (.addDocument iw document))))
+    (run! (fn [doc-map]
+            (.addDocument iw (doc-fn doc-map)))
+          doc-maps)))
