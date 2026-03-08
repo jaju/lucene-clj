@@ -1,0 +1,70 @@
+{:quick-benchmark-options
+ {:verbose false,
+  :num-samples 12,
+  :target-execution-time 100000000,
+  :warmup-jit-period 1000000000},
+ :benchmarks
+ [{:report
+   "                    Elapsed Time: 3.78 ns  3σ [-2.85 10.4]  min 2.85\n",
+   :elapsed-time
+   {:batch-size 5000,
+    :sample-count 200,
+    :mean-ns-per-op 3.7837099999999997,
+    :min-ns-per-op 2.85,
+    :max-ns-per-op 21.225,
+    :lower-bound-ns-per-op -2.8492435249253094,
+    :upper-bound-ns-per-op 10.41666352492531},
+   :name :compile-document-encoder}
+  {:report
+   "                    Elapsed Time: 33.2 µs  3σ [-125 191]  min 8.83\n",
+   :elapsed-time
+   {:batch-size 2,
+    :sample-count 200,
+    :mean-ns-per-op 33248.135,
+    :min-ns-per-op 8833.5,
+    :max-ns-per-op 469917.0,
+    :lower-bound-ns-per-op -124772.15245833728,
+    :upper-bound-ns-per-op 191268.4224583373},
+   :name :map->document-one-document}
+  {:report
+   "                    Elapsed Time: 7.53 µs  3σ [-4.16 19.2]  min 4.79\n",
+   :elapsed-time
+   {:batch-size 2,
+    :sample-count 200,
+    :mean-ns-per-op 7532.825,
+    :min-ns-per-op 4792.0,
+    :max-ns-per-op 56583.0,
+    :lower-bound-ns-per-op -4156.7068513572,
+    :upper-bound-ns-per-op 19222.3568513572},
+   :name :compiled-encode-one-document}
+  {:report
+   "Estimated time required for full JIT is 1.53e+03s, but limited to 10.0s.\n  pass `:limit-time-s 1.53e+03` to improve accuracy,\n  or consider benchmarks at a lower level.\n                    Elapsed Time: 7.04 ms  3σ [2.25 11.8]  min 5.38\n",
+   :elapsed-time
+   {:batch-size 1,
+    :sample-count 10,
+    :mean-ns-per-op 7043025.0,
+    :min-ns-per-op 5379417.0,
+    :max-ns-per-op 1.0498583E7,
+    :lower-bound-ns-per-op 2246671.0334783467,
+    :upper-bound-ns-per-op 1.1839378966521654E7},
+   :name :compiled-encode-benchmark-batch}
+  {:report
+   "Estimated time required for full JIT is 2.24e+04s, but limited to 10.0s.\n  pass `:limit-time-s 2.24e+04` to improve accuracy,\n  or consider benchmarks at a lower level.\n                    Elapsed Time: 31.6 ms  3σ [20.0 43.3]  min 28.1\n",
+   :elapsed-time
+   {:batch-size 1,
+    :sample-count 10,
+    :mean-ns-per-op 3.16493207E7,
+    :min-ns-per-op 2.8114834E7,
+    :max-ns-per-op 4.0574583E7,
+    :lower-bound-ns-per-op 1.998974531627079E7,
+    :upper-bound-ns-per-op 4.330889608372921E7},
+   :name :index-benchmark-batch}],
+ :criterium-version "0.5.153-ALPHA",
+ :java-version "25.0.2",
+ :label "pre-optimization",
+ :benchmark-doc-count 1000,
+ :git-sha "cc9c92d",
+ :os-name "Mac OS X",
+ :java-vm-name "Java HotSpot(TM) 64-Bit Server VM",
+ :run-at "2026-03-08T18:02:29.644643Z",
+ :os-arch "aarch64"}
