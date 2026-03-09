@@ -1,6 +1,6 @@
 (ns msync.lucene.field-types
   (:require [msync.lucene.values :as values])
-  (:import [org.apache.lucene.document Field Field$Store FieldType LongField StoredField StoredValue$Type StringField]
+  (:import [org.apache.lucene.document DoubleField Field Field$Store FieldType LongField StoredField StoredValue$Type StringField]
            [org.apache.lucene.index IndexOptions IndexableFieldType Term]
            [org.apache.lucene.search TermQuery]))
 
@@ -57,6 +57,19 @@
       (fn [value]
         (StoredField. lucene-field-name (long value))))))
 
+(defn- ->double-field-factory
+  [field-name {:keys [indexed? stored?]}]
+  (let [lucene-field-name (name field-name)
+        store-option      (->store-option stored?)]
+    (cond
+      indexed?
+      (fn [value]
+        (DoubleField. lucene-field-name (double value) store-option))
+
+      stored?
+      (fn [value]
+        (StoredField. lucene-field-name (double value))))))
+
 (defn- ->boolean-field-factory
   [field-name field-spec]
   (let [field-factory (->exact-string-field-factory field-name field-spec)]
@@ -99,6 +112,12 @@
     (mapv #(values/-normalize-long-value field-name %) raw-value)
     [(values/-normalize-long-value field-name raw-value)]))
 
+(defn- normalize-double-values
+  [field-name raw-value]
+  (if (multi-valued-input? raw-value)
+    (mapv #(values/-normalize-double-value field-name %) raw-value)
+    [(values/-normalize-double-value field-name raw-value)]))
+
 (defn- normalize-boolean-values
   [field-name raw-value]
   (if (multi-valued-input? raw-value)
@@ -110,6 +129,7 @@
   (let [base-normalizer (case type
                           (:text :keyword) #(values/-normalize-text-values field-name %)
                           :long            #(normalize-long-values field-name %)
+                          :double          #(normalize-double-values field-name %)
                           :boolean         #(normalize-boolean-values field-name %))]
     (fn [raw-value]
       (ensure-field-cardinality! field-name field-spec raw-value)
@@ -124,6 +144,7 @@
                        :text    (->text-field-factory field-name field-spec)
                        :keyword (->exact-string-field-factory field-name field-spec)
                        :long    (->long-field-factory field-name field-spec)
+                       :double  (->double-field-factory field-name field-spec)
                        :boolean (->boolean-field-factory field-name field-spec))})
 
 (defn -exact-query
@@ -137,6 +158,8 @@
                                   (str (values/-normalize-boolean-value field-name value))))
       :long    (LongField/newExactQuery (name field-name)
                                         (values/-normalize-long-value field-name value))
+      :double  (DoubleField/newExactQuery (name field-name)
+                                          (values/-normalize-double-value field-name value))
       nil)))
 
 (defn -stored-field-value

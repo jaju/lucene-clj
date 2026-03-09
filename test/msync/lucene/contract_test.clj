@@ -48,26 +48,30 @@
   (let [analyzer (analyzers/keyword-analyzer)
         store    (create-store [{:title  :rumours
                                  :year   1977
+                                 :rating 4.5
                                  :active true}]
                                {:fields {:title  {:type :keyword}
                                          :year   {:type :long}
+                                         :rating {:type :double}
                                          :active {:type :boolean}}}
                                analyzer)]
     (is (= 1 (count (lucene/search store {:title :rumours}))))
     (is (= 1 (count (lucene/search store {:year 1977}))))
+    (is (= 1 (count (lucene/search store {:rating 4.5}))))
     (is (= 1 (count (lucene/search store {:active true}))))))
 
 (deftest typed-hit-projections-can-decode-stored-values-with-field-specs
   (let [fields   {:year {:type :long}
+                  :rating {:type :double}
                   :active {:type :boolean}}
         analyzer (analyzers/keyword-analyzer)
-        store    (create-store [{:year 1977 :active true}]
+        store    (create-store [{:year 1977 :rating 4.5 :active true}]
                                {:fields fields}
                                analyzer)
         hits     (lucene/search store
                                 {:active true}
                                 {:hit->doc (document/fn:document->map :field-specs fields)})]
-    (is (= [{:active true :year 1977}]
+    (is (= [{:active true :rating 4.5 :year 1977}]
            (mapv :hit hits)))))
 
 (deftest typed-fields-support-exact-queries-after-reopening-an-index
@@ -92,18 +96,23 @@
 
 (deftest typed-fields-reject-incompatible-query-values
   (let [analyzer (analyzers/keyword-analyzer)
-        store    (create-store [{:year 1977 :active true}]
+        store    (create-store [{:year 1977 :rating 4.5 :active true}]
                                {:fields {:year   {:type :long}
+                                         :rating {:type :double}
                                          :active {:type :boolean}}}
                                analyzer)]
     (is (thrown-with-msg?
           clojure.lang.ExceptionInfo
-          #"Numeric query values require a :long field definition"
+          #"Numeric query values require a :long or :double field definition"
           (lucene/search store {:title 1977})))
     (is (thrown-with-msg?
           clojure.lang.ExceptionInfo
           #"expected an integer value for a :long field"
           (lucene/search store {:year "1977"})))
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"expected a numeric value for a :double field"
+          (lucene/search store {:rating "4.5"})))
     (is (thrown-with-msg?
           clojure.lang.ExceptionInfo
           #"expected true or false for a :boolean field"

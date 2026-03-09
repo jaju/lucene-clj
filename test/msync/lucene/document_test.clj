@@ -6,16 +6,19 @@
   (let [identifier (java.util.UUID/fromString "53ff6f5f-e4f2-4a5b-8a17-8a33cc0e8d61")
         field-specs {:title  {:type :keyword}
                      :year   {:type :long}
+                     :rating {:type :double}
                      :active {:type :boolean}
                      :id     {:type :keyword}}
         doc        (document/map->document {:title  :rumours
                                             :year   1977
+                                            :rating 4.5
                                             :active true
                                             :id     identifier}
                                            {:fields field-specs})
         hit        (document/document->map doc :field-specs field-specs)]
     (is (= {:title  "rumours"
             :year   1977
+            :rating 4.5
             :active true
             :id     (str identifier)}
            hit))))
@@ -53,6 +56,13 @@
         #"expected an integer value for a :long field"
         (document/map->document {:year "1977"}
                                 {:fields {:year {:type :long}}}))))
+
+(deftest map->document-rejects-non-double-values-for-double-fields
+  (is (thrown-with-msg?
+        clojure.lang.ExceptionInfo
+        #"expected a numeric value for a :double field"
+        (document/map->document {:rating "4.5"}
+                                {:fields {:rating {:type :double}}}))))
 
 (deftest map->document-rejects-non-boolean-values-for-boolean-fields
   (is (thrown-with-msg?

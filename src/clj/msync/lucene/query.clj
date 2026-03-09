@@ -81,7 +81,7 @@
   Number
   (parse [numeric-query {:keys [field-name] :as opts}]
     (or (field-types/-exact-query field-name (field-spec opts) numeric-query)
-        (typed-query-required! "Numeric query values require a :long field definition"
+        (typed-query-required! "Numeric query values require a :long or :double field definition"
                                {:field-name field-name
                                 :value      numeric-query
                                 :field-spec (field-spec opts)})))

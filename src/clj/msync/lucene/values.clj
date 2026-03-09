@@ -55,6 +55,22 @@
     :else
     (invalid-text-value! field-name value "expected an integer value for a :long field")))
 
+(defn -normalize-double-value
+  "Normalize a numeric value into a Java double for :double fields."
+  [field-name value]
+  (cond
+    (nil? value)
+    (invalid-text-value! field-name value "nil values are not indexed or queried")
+
+    (number? value)
+    (let [double-value (double value)]
+      (if (Double/isFinite double-value)
+        double-value
+        (invalid-text-value! field-name value "expected a finite numeric value for a :double field")))
+
+    :else
+    (invalid-text-value! field-name value "expected a numeric value for a :double field")))
+
 (defn -normalize-boolean-value
   "Normalize a boolean value for :boolean fields."
   [field-name value]

@@ -11,7 +11,7 @@
   #{:indexed-fields :stored-fields :keyword-fields :suggest-fields :context-fn})
 
 (def ^:private field-type-schema
-  [:enum :text :keyword :long :boolean])
+  [:enum :text :keyword :long :boolean :double])
 
 (def ^:private context-source-schema
   [:fn
