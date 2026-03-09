@@ -62,15 +62,6 @@
                                  :Subgenre keyword-analyzer}))
 ;; Creating Analyzers:1 ends here
 
-(def sample-index-fields
-  #{:first-name :last-name :age :real :gender :bio})
-
-(def sample-suggest-fields
-  {:first-name 1})
-
-(def sample-keyword-fields
-  #{:age})
-
 (def suggestion-context-fields
   [:real])
 
@@ -81,14 +72,31 @@
        vals
        (map s/lower-case)))
 
+(def sample-fields
+  {:first-name {:type    :text
+                :stored? true
+                :indexed? true
+                :suggest {:contexts-from sample-contexts}}
+   :last-name  {:type :text
+                :stored? true
+                :indexed? true}
+   :age        {:type :keyword
+                :stored? true
+                :indexed? true}
+   :real       {:type :text
+                :stored? true
+                :indexed? true}
+   :gender     {:type :text
+                :stored? true
+                :indexed? true}
+   :bio        {:type :text
+                :stored? true
+                :indexed? true}})
+
 (defn create-sample-store
   "Create and populate the in-memory sample index used by semantic API tests."
   []
   (let [store (lucene/create-index! :type :memory :analyzer default-analyzer)]
     (lucene/index! store sample-data
-                   {:indexed-fields sample-index-fields
-                    :suggest-fields sample-suggest-fields
-                    :context-fn     sample-contexts
-                    :stored-fields  sample-index-fields
-                    :keyword-fields sample-keyword-fields})
+                   {:fields sample-fields})
     store))

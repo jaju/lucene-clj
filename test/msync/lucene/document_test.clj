@@ -8,7 +8,10 @@
                                             :year   1977
                                             :active true
                                             :id     identifier}
-                                           {:stored-fields [:title :year :active :id]})
+                                           {:fields {:title  {:type :keyword}
+                                                     :year   {:type :keyword}
+                                                     :active {:type :keyword}
+                                                     :id     {:type :keyword}}})
         hit        (document/document->map doc)]
     (is (= {:title  "rumours"
             :year   "1977"
@@ -20,10 +23,19 @@
   (is (thrown-with-msg?
         clojure.lang.ExceptionInfo
         #"nil values are not indexed or queried"
-        (document/map->document {:title nil} {:stored-fields [:title]}))))
+        (document/map->document {:title nil}
+                                {:fields {:title {:type :text}}}))))
 
 (deftest map->document-rejects-nested-maps
   (is (thrown-with-msg?
         clojure.lang.ExceptionInfo
         #"nested maps are not supported"
-        (document/map->document {:title {:nested "value"}} {:stored-fields [:title]}))))
+        (document/map->document {:title {:nested "value"}}
+                                {:fields {:title {:type :text}}}))))
+
+(deftest map->document-rejects-multi-values-on-single-valued-fields
+  (is (thrown-with-msg?
+        clojure.lang.ExceptionInfo
+        #"not marked :multi-valued"
+        (document/map->document {:tags ["rock" "pop"]}
+                                {:fields {:tags {:type :keyword}}}))))

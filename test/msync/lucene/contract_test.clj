@@ -49,8 +49,9 @@
         store    (create-store [{:title  :rumours
                                  :year   1977
                                  :active true}]
-                               {:stored-fields  [:title :year :active]
-                                :keyword-fields [:title :year :active]}
+                               {:fields {:title  {:type :keyword}
+                                         :year   {:type :keyword}
+                                         :active {:type :keyword}}}
                                analyzer)]
     (is (= 1 (count (lucene/search store {:title :rumours}))))
     (is (= 1 (count (lucene/search store {:year 1977}))))
@@ -59,9 +60,8 @@
 (deftest suggest-respects-max-results-without-a-hidden-cap
   (let [analyzer (analyzers/keyword-analyzer)
         docs     (mapv (fn [n] {:name (str "sample-" n)}) (range 15))
-        store    (create-store docs {:stored-fields [:name]
-                                     :keyword-fields [:name]
-                                     :suggest-fields [:name]}
+        store    (create-store docs {:fields {:name {:type    :keyword
+                                                     :suggest {:weight 1}}}}
                                analyzer)
         results  (lucene/suggest store :name "sample-" {:max-results 12
                                                         :hit->doc document/document->map})]
@@ -73,3 +73,15 @@
           clojure.lang.ExceptionInfo
           #"requires :max-results to be a positive integer"
           (lucene/suggest store :first-name "S" {:max-results 0})))))
+
+(deftest index-requires-canonical-field-specs
+  (let [store (lucene/create-index! :type :memory :analyzer common/default-analyzer)
+        docs  [{:title "Rumours"}]]
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"requires a :fields map"
+          (lucene/index! store docs {})))
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"no longer accepts bucketed field options"
+          (lucene/index! store docs {:stored-fields [:title]})))))

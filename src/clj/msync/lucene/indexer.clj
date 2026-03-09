@@ -98,9 +98,9 @@
 (defmethod index! IndexWriter
   [^IndexWriter iw
    doc-maps
-   {:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn] :as doc-opts}]
+   indexing-options]
   (let [doc-maps (validation/-normalize-document-maps doc-maps)
-        doc-fn   (d/-map->document-fn doc-opts)]
+        doc-fn   (d/-map->document-fn indexing-options)]
     (run! (fn [doc-map]
             (.addDocument iw (doc-fn doc-map)))
           doc-maps)))

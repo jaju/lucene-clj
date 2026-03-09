@@ -1,4 +1,5 @@
 (def lucene-version "10.4.0")
+(def malli-version "0.20.0")
 (def matcher-combinators-version "3.9.2")
 (def test-check-version "1.1.3")
 (def kaocha-version "1.91.1392")
@@ -10,6 +11,7 @@
   :license {:name "Eclipse Public License"
             :url  "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.12.4"]
+                 [metosin/malli ~malli-version]
                  [org.apache.lucene/lucene-core ~lucene-version]
                  [org.apache.lucene/lucene-queryparser ~lucene-version]
                  [org.apache.lucene/lucene-analysis-common ~lucene-version]

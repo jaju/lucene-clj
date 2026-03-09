@@ -1,5 +1,6 @@
 (ns msync.lucene.document
-  (:require [msync.lucene.values :as values])
+  (:require [msync.lucene.schema :as schema]
+            [msync.lucene.values :as values])
   (:import [org.apache.lucene.index IndexOptions IndexableFieldType]
            [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
            [org.apache.lucene.document FieldType Field Document]))
@@ -28,15 +29,16 @@
       (.setTokenized tokenize?)
       (.freeze))))
 
-(defn- reserved-name? [field-name]
+(defn- user-field-name?
+  [field-name]
   (not (.startsWith (name field-name) suggest-field-prefix)))
 
 (defn- ->field-factory
   "Build a reusable Lucene field constructor for a logical field."
-  [field-name opts]
-  {:pre [(reserved-name? field-name)]}
+  [field-name field-options]
+  {:pre [(user-field-name? field-name)]}
   (let [field-name (name field-name)
-        field-type (->field-type opts)]
+        field-type (->field-type field-options)]
     (fn [^String value]
       (Field. field-name value field-type))))
 
@@ -76,72 +78,103 @@
        repeat)
      doc-vecs)))
 
-(defn- normalize-suggest-fields
-  [suggest-fields]
-  (reduce
-    (fn [weights entry]
-      (if (and (sequential? entry)
-               (= 2 (count entry)))
-        (assoc weights (first entry) (second entry))
-        (assoc weights entry 1)))
-    {}
-    suggest-fields))
+(defn- field-options
+  [{:keys [type indexed? stored?]}]
+  {:index-type (if indexed? :full :none)
+   :store?     stored?
+   :tokenize?  (= :text type)})
+
+(defn- multi-valued-input?
+  [value]
+  (and (coll? value)
+       (not (string? value))
+       (not (map? value))))
+
+(defn- normalize-field-values
+  [field-name {:keys [type multi-valued?] :as field-spec} raw-value]
+  (when (and (multi-valued-input? raw-value)
+             (not multi-valued?))
+    (throw (ex-info "Field value is multi-valued, but the field is not marked :multi-valued?"
+                    {:field-name field-name
+                     :field-spec field-spec
+                     :value      raw-value})))
+  (case type
+    (:text :keyword) (values/-normalize-text-values field-name raw-value)))
+
+(defn- compile-contexts-fn
+  [context-source]
+  (cond
+    (nil? context-source)
+    (constantly [])
+
+    (keyword? context-source)
+    (fn [doc-map]
+      (values/-normalize-optional-text-values context-source
+                                              (get doc-map context-source)))
+
+    (sequential? context-source)
+    (fn [doc-map]
+      (into []
+            (mapcat (fn [context-field-name]
+                      (values/-normalize-optional-text-values context-field-name
+                                                              (get doc-map context-field-name))))
+            context-source))
+
+    :else
+    (fn [doc-map]
+      (values/-normalize-optional-text-values :suggest-contexts
+                                              (context-source doc-map)))))
+
+(defn- compile-field-spec
+  [field-name {:keys [suggest] :as field-spec}]
+  {:field-spec            field-spec
+   :field-factory         (when (or (:indexed? field-spec) (:stored? field-spec))
+                            (->field-factory field-name (field-options field-spec)))
+   :suggest-field-factory (when suggest
+                            (->suggest-field-factory field-name (:weight suggest)))
+   :contexts-fn           (when suggest
+                            (compile-contexts-fn (:contexts-from suggest)))})
+
+(defn- unknown-field!
+  [field-name field-encoders]
+  (throw (ex-info "Document contains a field that is missing from :fields"
+                  {:field-name     field-name
+                   :known-fields   (keys field-encoders)
+                   :indexing-style :fields})))
 
 (defn- compile-document-options
-  "Compile document options into reusable field and suggestion constructors."
-  [{:keys [indexed-fields stored-fields keyword-fields suggest-fields context-fn]}]
-  (let [indexed-fields              (when indexed-fields
-                                      (zipmap indexed-fields (repeat :full)))
-        stored-fields               (when stored-fields
-                                      (into #{} stored-fields))
-        keyword-fields              (into #{} keyword-fields)
-        suggest-field-weights       (normalize-suggest-fields suggest-fields)
-        field-options-for           (fn [field-name]
-                                      {:index-type (if indexed-fields
-                                                     (get indexed-fields field-name :none)
-                                                     :full)
-                                       :store?     (if stored-fields
-                                                     (contains? stored-fields field-name)
-                                                     true)
-                                       :tokenize?  (not (contains? keyword-fields field-name))})
-        field-factory-for           (memoize
-                                      (fn [field-name]
-                                        (->field-factory field-name
-                                                         (field-options-for field-name))))
-        suggest-field-factory-for   (into {}
-                                          (map (fn [[field-name weight]]
-                                                 [field-name
-                                                  (->suggest-field-factory field-name weight)]))
-                                          suggest-field-weights)]
-    {:field-factory-for         field-factory-for
-     :suggest-field-factory-for suggest-field-factory-for
-     :contexts-fn               (or context-fn (constantly []))}))
+  "Compile canonical field specs into reusable document encoders."
+  [indexing-options]
+  (let [field-specs (:fields (schema/-normalize-indexing-options indexing-options))]
+    {:field-encoders (into {}
+                           (map (fn [[field-name field-spec]]
+                                  [field-name (compile-field-spec field-name field-spec)]))
+                           field-specs)}))
 
 (defn- encode-document
-  "Encode a normalized Clojure document map as a Lucene document using compiled options."
-  [doc-map {:keys [field-factory-for suggest-field-factory-for contexts-fn]}]
-  (let [contexts (values/-normalize-optional-text-values :suggest-contexts
-                                                         (contexts-fn doc-map))
-        doc      (Document.)]
+  "Encode a Clojure document map as a Lucene document using compiled field encoders."
+  [doc-map {:keys [field-encoders]}]
+  (let [doc (Document.)]
     (doseq [[field-name raw-value] doc-map]
-      (let [field-values (values/-normalize-text-values field-name raw-value)]
-        (add-fields! doc field-values (field-factory-for field-name))
-        (when-let [suggest-field-factory (get suggest-field-factory-for field-name)]
-          (add-suggest-fields! doc field-values contexts suggest-field-factory))))
+      (let [{:keys [field-spec field-factory suggest-field-factory contexts-fn]}
+            (or (get field-encoders field-name)
+                (unknown-field! field-name field-encoders))
+            field-values (normalize-field-values field-name field-spec raw-value)]
+        (when field-factory
+          (add-fields! doc field-values field-factory))
+        (when suggest-field-factory
+          (add-suggest-fields! doc
+                               field-values
+                               (contexts-fn doc-map)
+                               suggest-field-factory))))
     doc))
 
 (defn map->document
   "Convert a map to a Lucene document.
   Lossy on the way back. Also, string field names come back as keywords.
-
-  indexed-fields => fields that are fully indexed
-  stored-fields => fields that are stored in the index
-  keyword-fields => fields that are considered verbatim, without tokenization
-  suggest-fields => fields that support suggestion-querying. This is a list consisting of a mix of field-names and [field-name weight]
-                    Default weight is 1
-  context-fn => a function that takes the input map and returns a list of contexts. (This needs more explanation)"
-  [m doc-opts]
-  (encode-document m (compile-document-options doc-opts)))
+  Indexing behavior is driven by canonical field specs under :fields."
+  [document-map indexing-options]
+  (encode-document document-map (compile-document-options indexing-options)))
 
 (defn document->map
   "Convenience function.
@@ -165,10 +198,10 @@
 
 (defn -map->document-fn
   "Build a document encoder function for the supplied indexing options."
-  [doc-opts]
-  (let [compiled-options (compile-document-options doc-opts)]
-    (fn [doc-map]
-      (encode-document doc-map compiled-options))))
+  [indexing-options]
+  (let [compiled-options (compile-document-options indexing-options)]
+    (fn [document-map]
+      (encode-document document-map compiled-options))))
 
 (def fn:map->document -map->document-fn)
 
