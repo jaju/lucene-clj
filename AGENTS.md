@@ -30,3 +30,11 @@ Before adding a feature, ask:
 2. Can it fit the map-first, low-cognitive-load API style?
 3. Can we explain and test its ranking behavior?
 4. Does it keep the project narrow enough to remain maintainable across Lucene upgrades?
+
+## API Design Principles
+
+- Prefer one canonical data model over compatibility layers when the old design obscures intent.
+- One field should have one definition in one place.
+- Public examples and docs should teach only the preferred API shape.
+- Validate schemas at boundaries; do not add validation or coercion overhead to hot indexing loops by default.
+- Any hot-path refactor should be benchmarked before and after with captured results.

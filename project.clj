@@ -4,7 +4,7 @@
 (def kaocha-version "1.91.1392")
 (def criterium-version "0.5.153-ALPHA")
 
-(defproject org.msync/lucene-clj "0.2.0-SNAPSHOT"
+(defproject org.msync/lucene-clj "0.3.0-SNAPSHOT"
   :description "Lucene bindings for Clojure"
   :url "https://github.com/jaju/lucene-clj"
   :license {:name "Eclipse Public License"

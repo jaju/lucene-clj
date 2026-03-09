@@ -28,7 +28,7 @@ Notably
 
 * Adding Dependency to a Project                                    :version:
 #+BEGIN_SRC clojure
-    [org.msync/lucene-clj "0.2.0-SNAPSHOT"]
+    [org.msync/lucene-clj "0.3.0-SNAPSHOT"]
 #+END_SRC
 Available via [[https://clojars.org/search?q=lucene-clj][clojars]].
 
@@ -87,6 +87,27 @@ At least for now, /lucene-clj/ is not trying to be:
 - a direct exposure of low-level Lucene internals when a smaller Clojure abstraction is sufficient
 
 This focus is intentional. Lucene is vast; /lucene-clj/ aims to be small, opinionated, and excellent at embedded retrieval rather than broad and thin.
+
+* Benchmarking
+
+/lucene-clj/ includes a small benchmark harness for the indexing hot path.
+
+Run it with:
+
+#+BEGIN_SRC bash
+lein bench benchmarks/manual.edn manual $(git rev-parse --short HEAD)
+#+END_SRC
+
+This writes EDN captures under =benchmarks/= so performance changes can be reviewed and committed.
+
+Current measured improvements from the first indexing hot-path refactor:
+
+- ~map->document~ for one document: ~33.2 us~ -> ~6.15 us~
+- compiled one-document encode: ~7.53 us~ -> ~4.10 us~
+- compiled batch encode: ~7.04 ms~ -> ~5.18 ms~
+- batch indexing: ~31.6 ms~ -> ~25.8 ms~
+
+The benchmark harness separates encoder cost from end-to-end indexing cost so hot-path changes can be evaluated more precisely.
 
 * Usage - A Complete Scenario
 
