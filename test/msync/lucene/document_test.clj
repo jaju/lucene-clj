@@ -4,20 +4,27 @@
 
 (deftest map->document-normalizes-supported-scalar-values
   (let [identifier (java.util.UUID/fromString "53ff6f5f-e4f2-4a5b-8a17-8a33cc0e8d61")
+        field-specs {:title  {:type :keyword}
+                     :year   {:type :long}
+                     :active {:type :boolean}
+                     :id     {:type :keyword}}
         doc        (document/map->document {:title  :rumours
                                             :year   1977
                                             :active true
                                             :id     identifier}
-                                           {:fields {:title  {:type :keyword}
-                                                     :year   {:type :long}
-                                                     :active {:type :boolean}
-                                                     :id     {:type :keyword}}})
-        hit        (document/document->map doc)]
+                                           {:fields field-specs})
+        hit        (document/document->map doc :field-specs field-specs)]
     (is (= {:title  "rumours"
             :year   1977
-            :active "true"
+            :active true
             :id     (str identifier)}
            hit))))
+
+(deftest document->map-leaves-boolean-values-as-stored-strings-without-field-specs
+  (let [doc (document/map->document {:active false}
+                                    {:fields {:active {:type :boolean}}})]
+    (is (= {:active "false"}
+           (document/document->map doc)))))
 
 (deftest map->document-rejects-nil-values
   (is (thrown-with-msg?

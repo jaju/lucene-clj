@@ -1,15 +1,15 @@
 (ns msync.lucene.query
   (:require [msync.lucene
+             [field-types :as field-types]
              [schema :as schema]
              [values :as values]])
   (:import
-    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur FuzzyQuery TermQuery]
+    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur FuzzyQuery]
     [clojure.lang Named Sequential IPersistentSet IPersistentMap IMapEntry]
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]
     [org.apache.lucene.queryparser.classic QueryParser]
-    [org.apache.lucene.index Term]
-    [org.apache.lucene.document LongField]))
+    [org.apache.lucene.index Term]))
 
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
@@ -19,19 +19,6 @@
 (defn- field-spec
   [{:keys [field-name field-specs]}]
   (schema/-field-spec field-specs field-name))
-
-(defn- exact-query
-  [field-name field-spec value]
-  (case (:type field-spec)
-    :text    nil
-    :keyword (TermQuery. (Term. (name field-name)
-                                (values/-normalize-text-value field-name value)))
-    :boolean (TermQuery. (Term. (name field-name)
-                                (str (values/-normalize-boolean-value field-name value))))
-    :long    (LongField/newExactQuery (name field-name)
-                                      (values/-normalize-long-value field-name value))
-    nil      nil
-    nil))
 
 (defn- typed-query-required!
   [message data]
@@ -77,7 +64,7 @@
   String
   (parse [str-query {:keys [^Analyzer analyzer field-name query-type] :as opts}]
     (let [builder        (QueryBuilder. analyzer)
-          resolved-query (or (exact-query field-name (field-spec opts) str-query)
+          resolved-query (or (field-types/-exact-query field-name (field-spec opts) str-query)
                              (let [query-type (or query-type (if (re-find #"\s" str-query)
                                                                :phrase-query
                                                                :query))]
@@ -93,7 +80,7 @@
 
   Number
   (parse [numeric-query {:keys [field-name] :as opts}]
-    (or (exact-query field-name (field-spec opts) numeric-query)
+    (or (field-types/-exact-query field-name (field-spec opts) numeric-query)
         (typed-query-required! "Numeric query values require a :long field definition"
                                {:field-name field-name
                                 :value      numeric-query
@@ -101,7 +88,7 @@
 
   Boolean
   (parse [boolean-query {:keys [field-name] :as opts}]
-    (or (exact-query field-name (field-spec opts) boolean-query)
+    (or (field-types/-exact-query field-name (field-spec opts) boolean-query)
         (typed-query-required! "Boolean query values require a :boolean field definition"
                                {:field-name field-name
                                 :value      boolean-query

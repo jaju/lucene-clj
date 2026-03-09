@@ -57,6 +57,19 @@
     (is (= 1 (count (lucene/search store {:year 1977}))))
     (is (= 1 (count (lucene/search store {:active true}))))))
 
+(deftest typed-hit-projections-can-decode-stored-values-with-field-specs
+  (let [fields   {:year {:type :long}
+                  :active {:type :boolean}}
+        analyzer (analyzers/keyword-analyzer)
+        store    (create-store [{:year 1977 :active true}]
+                               {:fields fields}
+                               analyzer)
+        hits     (lucene/search store
+                                {:active true}
+                                {:hit->doc (document/fn:document->map :field-specs fields)})]
+    (is (= [{:active true :year 1977}]
+           (mapv :hit hits)))))
+
 (deftest typed-fields-support-exact-queries-after-reopening-an-index
   (let [index-path (str (java.nio.file.Files/createTempDirectory
                           "lucene-clj-typed-"

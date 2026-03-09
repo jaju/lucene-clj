@@ -1,87 +1,15 @@
 (ns msync.lucene.document
-  (:require [msync.lucene.schema :as schema]
+  (:require [msync.lucene.field-types :as field-types]
+            [msync.lucene.schema :as schema]
             [msync.lucene.values :as values])
-  (:import [org.apache.lucene.index IndexOptions IndexableFieldType]
-           [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
-           [org.apache.lucene.document FieldType Field Field$Store Document StringField LongField StoredField StoredValue$Type]))
+  (:import [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
+           [org.apache.lucene.document Field Document]))
 
 (def suggest-field-prefix "$suggest-")
-
-(def ^:private ->index-options
-  {:full IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
-   true IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS
-
-   :none IndexOptions/NONE
-   :nil IndexOptions/NONE
-   false IndexOptions/NONE
-
-   :docs-freqs IndexOptions/DOCS_AND_FREQS
-   :docs-freqs-pos IndexOptions/DOCS_AND_FREQS_AND_POSITIONS})
-
-(defn- ^IndexableFieldType ->field-type
-  "Each field's information is carried in its corresponding IndexableFieldType attribute. Internal detail."
-  [{:keys [index-type store? tokenize?]
-    :or {tokenize? true store? false}}]
-  (let [index-options (->index-options index-type IndexOptions/NONE)]
-    (doto (FieldType.)
-      (.setIndexOptions index-options)
-      (.setStored store?)
-      (.setTokenized tokenize?)
-      (.freeze))))
 
 (defn- user-field-name?
   [field-name]
   (not (.startsWith (name field-name) suggest-field-prefix)))
-
-(defn- ->field-factory
-  "Build a reusable Lucene field constructor for a logical field."
-  [field-name field-options]
-  {:pre [(user-field-name? field-name)]}
-  (let [field-name (name field-name)
-        field-type (->field-type field-options)]
-    (fn [^String value]
-      (Field. field-name value field-type))))
-
-(defn- ->store-option
-  [stored?]
-  (if stored?
-    Field$Store/YES
-    Field$Store/NO))
-
-(defn- ->exact-string-field-factory
-  [field-name {:keys [indexed? stored?]}]
-  {:pre [(user-field-name? field-name)]}
-  (let [field-name   (name field-name)
-        store-option (->store-option stored?)]
-    (cond
-      indexed?
-      (fn [^String value]
-        (StringField. field-name value store-option))
-
-      stored?
-      (fn [^String value]
-        (StoredField. field-name value)))))
-
-(defn- ->long-field-factory
-  [field-name {:keys [indexed? stored?]}]
-  {:pre [(user-field-name? field-name)]}
-  (let [field-name   (name field-name)
-        store-option (->store-option stored?)]
-    (cond
-      indexed?
-      (fn [value]
-        (LongField. field-name (long value) store-option))
-
-      stored?
-      (fn [value]
-        (StoredField. field-name (long value))))))
-
-(defn- ->boolean-field-factory
-  [field-name {:keys [indexed? stored?]}]
-  (let [field-factory (->exact-string-field-factory field-name {:indexed? indexed? :stored? stored?})]
-    (when field-factory
-      (fn [value]
-        (field-factory (str value))))))
 
 (defn- ->suggest-field-factory
   "Build a reusable suggestion field constructor for a logical field."
@@ -102,22 +30,11 @@
   (doseq [field-value field-values]
     (.add document (suggest-field-factory field-value contexts))))
 
-(defn- stored-field-value
-  [^Field field]
-  (let [stored-value (.storedValue field)]
-    (if (nil? stored-value)
-      (.stringValue field)
-      (condp = (.getType stored-value)
-        StoredValue$Type/INTEGER (.getIntValue stored-value)
-        StoredValue$Type/LONG (.getLongValue stored-value)
-        StoredValue$Type/FLOAT (.getFloatValue stored-value)
-        StoredValue$Type/DOUBLE (.getDoubleValue stored-value)
-        StoredValue$Type/STRING (.getStringValue stored-value)
-        StoredValue$Type/BINARY (.getBinaryValue stored-value)
-        StoredValue$Type/DATA_INPUT (.getDataInputValue stored-value)))))
-
-(defn- field->kv [^Field field]
-  [(-> field .name keyword) (stored-field-value field)])
+(defn- field->entry
+  [field-specs ^Field field]
+  (let [field-name (-> field .name keyword)
+        field-spec (schema/-field-spec field-specs field-name)]
+    [field-name (field-types/-stored-field-value field-spec field)]))
 
 (defn vecs->maps
   "Collection of vectors, with the first considered the header.
@@ -132,53 +49,6 @@
        (map keyword)
        repeat)
      doc-vecs)))
-
-(defn- field-options
-  [{:keys [type indexed? stored?]}]
-  {:index-type (if indexed? :full :none)
-   :store?     stored?
-   :tokenize?  (= :text type)})
-
-(defn- multi-valued-input?
-  [value]
-  (and (coll? value)
-       (not (string? value))
-       (not (map? value))))
-
-(defn- ensure-field-cardinality!
-  [field-name {:keys [multi-valued?] :as field-spec} raw-value]
-  (when (and (multi-valued-input? raw-value)
-             (not multi-valued?))
-    (throw (ex-info "Field value is multi-valued, but the field is not marked :multi-valued?"
-                    {:field-name field-name
-                     :field-spec field-spec
-                     :value      raw-value}))))
-
-(defn- normalize-long-values
-  [field-name raw-value]
-  (if (multi-valued-input? raw-value)
-    (mapv #(values/-normalize-long-value field-name %) raw-value)
-    [(values/-normalize-long-value field-name raw-value)]))
-
-(defn- normalize-boolean-values
-  [field-name raw-value]
-  (if (multi-valued-input? raw-value)
-    (mapv #(values/-normalize-boolean-value field-name %) raw-value)
-    [(values/-normalize-boolean-value field-name raw-value)]))
-
-(defn- compile-value-normalizer
-  [field-name {:keys [type] :as field-spec}]
-  (let [base-normalizer (case type
-                          (:text :keyword) #(values/-normalize-text-values field-name %)
-                          :long            #(normalize-long-values field-name %)
-                          :boolean         #(normalize-boolean-values field-name %))]
-    (fn [raw-value]
-      (ensure-field-cardinality! field-name field-spec raw-value)
-      (base-normalizer raw-value))))
-
-(defn- normalize-field-values
-  [normalize-values raw-value]
-  (normalize-values raw-value))
 
 (defn- compile-contexts-fn
   [context-source]
@@ -206,18 +76,11 @@
 
 (defn- compile-field-spec
   [field-name {:keys [suggest] :as field-spec}]
-  {:field-spec            field-spec
-   :normalize-values      (compile-value-normalizer field-name field-spec)
-   :field-factory         (case (:type field-spec)
-                            :text    (when (or (:indexed? field-spec) (:stored? field-spec))
-                                       (->field-factory field-name (field-options field-spec)))
-                            :keyword (->exact-string-field-factory field-name field-spec)
-                            :long    (->long-field-factory field-name field-spec)
-                            :boolean (->boolean-field-factory field-name field-spec))
-   :suggest-field-factory (when suggest
-                            (->suggest-field-factory field-name (:weight suggest)))
-   :contexts-fn           (when suggest
-                            (compile-contexts-fn (:contexts-from suggest)))})
+  (assoc (field-types/-compile-field-codec field-name field-spec)
+         :suggest-field-factory (when suggest
+                                  (->suggest-field-factory field-name (:weight suggest)))
+         :contexts-fn           (when suggest
+                                  (compile-contexts-fn (:contexts-from suggest)))))
 
 (defn- unknown-field!
   [field-name field-encoders]
@@ -240,10 +103,10 @@
   [doc-map {:keys [field-encoders]}]
   (let [doc (Document.)]
     (doseq [[field-name raw-value] doc-map]
-      (let [{:keys [normalize-values field-factory suggest-field-factory contexts-fn]}
+        (let [{:keys [normalize-values field-factory suggest-field-factory contexts-fn]}
             (or (get field-encoders field-name)
                 (unknown-field! field-name field-encoders))
-            field-values (normalize-field-values normalize-values raw-value)]
+            field-values (normalize-values raw-value)]
         (when field-factory
           (add-fields! doc field-values field-factory))
         (when suggest-field-factory
@@ -262,16 +125,16 @@
 
 (defn document->map
   "Convenience function.
-  Lucene document to map. Keys are always keywords. Values come back as string.
-  Only stored fields come back."
-  [^Document document & {:keys [fields-to-keep multi-fields]}]
+  Lucene document to map. Keys are always keywords. Only stored fields come back.
+  Pass :field-specs to decode typed stored values such as booleans."
+  [^Document document & {:keys [field-specs fields-to-keep multi-fields]}]
   (let [fields-to-keep (if (nil? fields-to-keep)
                          (constantly true)
                          fields-to-keep)
         multi-fields (into #{} multi-fields)]
     (reduce
       (fn [m ^Field field]
-        (let [[k v] (field->kv field)]
+        (let [[k v] (field->entry field-specs field)]
           (if (fields-to-keep k)
             (if (multi-fields k)
               (update m k (fnil conj []) v)
