@@ -1,6 +1,5 @@
 (ns msync.lucene.values
   (:import [clojure.lang Named]
-           [org.apache.lucene.search Query]
            [java.net URI]
            [java.time.temporal TemporalAccessor]
            [java.util UUID]))
@@ -92,25 +91,3 @@
   (if (nil? value)
     []
     (-normalize-text-values field-name value)))
-
-(defn -normalize-query-form
-  "Recursively normalize a public query form so that all scalar leaf values are strings."
-  [query-form]
-  (cond
-    (instance? Query query-form)
-    query-form
-
-    (map? query-form)
-    (into (empty query-form)
-          (map (fn [[field-name value]]
-                 [field-name (-normalize-query-form value)]))
-          query-form)
-
-    (set? query-form)
-    (into #{} (map -normalize-query-form) query-form)
-
-    (sequential? query-form)
-    (mapv -normalize-query-form query-form)
-
-    :else
-    (-normalize-text-value :query query-form)))

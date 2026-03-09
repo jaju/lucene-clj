@@ -35,6 +35,7 @@ Before adding a feature, ask:
 
 - Prefer one canonical data model over compatibility layers when the old design obscures intent.
 - One field should have one definition in one place.
+- Keep each field type's encode, exact-query, and decode behavior in one internal module.
 - Public examples and docs should teach only the preferred API shape.
 - Validate schemas at boundaries; do not add validation or coercion overhead to hot indexing loops by default.
 - Any hot-path refactor should be benchmarked before and after with captured results.

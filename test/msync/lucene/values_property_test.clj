@@ -25,49 +25,6 @@
     (name value)
     (str value)))
 
-(defn- query-form-shape
-  "Replace every scalar leaf with ::leaf so shape comparisons ignore concrete values."
-  [query-form]
-  (cond
-    (map? query-form)
-    (into (empty query-form)
-          (map (fn [[field-name value]]
-                 [field-name (query-form-shape value)]))
-          query-form)
-
-    (set? query-form)
-    (into #{} (map query-form-shape) query-form)
-
-    (sequential? query-form)
-    (mapv query-form-shape query-form)
-
-    :else
-    ::leaf))
-
-(defn- string-leaves?
-  "Return true when every scalar leaf in a normalized query form is a string."
-  [query-form]
-  (cond
-    (map? query-form)
-    (every? string-leaves? (vals query-form))
-
-    (set? query-form)
-    (every? string-leaves? query-form)
-
-    (sequential? query-form)
-    (every? string-leaves? query-form)
-
-    :else
-    (string? query-form)))
-
-(def query-form-generator
-  (gen/recursive-gen
-    (fn [inner]
-      (gen/one-of [(gen/vector inner 0 4)
-                   (gen/set inner {:max-elements 4})
-                   (gen/map field-name-generator inner {:max-elements 4})]))
-    supported-scalar-generator))
-
 (defspec normalize-text-value-stringifies-supported-scalars 100
   (prop/for-all [value supported-scalar-generator]
     (= (expected-normalized-value value)
@@ -78,10 +35,3 @@
                  field-values (gen/vector supported-scalar-generator 1 6)]
     (= (mapv expected-normalized-value field-values)
        (values/-normalize-text-values field-name field-values))))
-
-(defspec normalize-query-form-preserves-shape-and-stringifies-leaves 100
-  (prop/for-all [query-form query-form-generator]
-    (let [normalized-query (values/-normalize-query-form query-form)]
-      (and (= (query-form-shape query-form)
-              (query-form-shape normalized-query))
-           (string-leaves? normalized-query)))))
