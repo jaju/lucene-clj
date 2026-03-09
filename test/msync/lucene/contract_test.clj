@@ -45,42 +45,57 @@
           (lucene/search store {:first-name "Oliver"} {:page -1})))))
 
 (deftest scalar-values-are-searchable-after-normalization
-  (let [analyzer (analyzers/keyword-analyzer)
+  (let [published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")
+        analyzer (analyzers/keyword-analyzer)
         store    (create-store [{:title  :rumours
                                  :year   1977
                                  :rating 4.5
+                                 :published-at published-at
                                  :active true}]
                                {:fields {:title  {:type :keyword}
                                          :year   {:type :long}
                                          :rating {:type :double}
+                                         :published-at {:type :instant}
                                          :active {:type :boolean}}}
                                analyzer)]
     (is (= 1 (count (lucene/search store {:title :rumours}))))
     (is (= 1 (count (lucene/search store {:year 1977}))))
     (is (= 1 (count (lucene/search store {:rating 4.5}))))
+    (is (= 1 (count (lucene/search store {:published-at published-at}))))
+    (is (= 1 (count (lucene/search store {:published-at (java.util.Date/from published-at)}))))
     (is (= 1 (count (lucene/search store {:active true}))))))
 
 (deftest typed-hit-projections-can-decode-stored-values-with-field-specs
   (let [fields   {:year {:type :long}
                   :rating {:type :double}
+                  :published-at {:type :instant}
                   :active {:type :boolean}}
+        published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")
         analyzer (analyzers/keyword-analyzer)
-        store    (create-store [{:year 1977 :rating 4.5 :active true}]
+        store    (create-store [{:year 1977 :rating 4.5 :published-at published-at :active true}]
                                {:fields fields}
                                analyzer)
         hits     (lucene/search store
                                 {:active true}
                                 {:hit->doc (document/fn:document->map :field-specs fields)})]
-    (is (= [{:active true :rating 4.5 :year 1977}]
+    (is (= [{:active true :published-at published-at :rating 4.5 :year 1977}]
            (mapv :hit hits)))))
 
 (deftest typed-fields-support-exact-queries-after-reopening-an-index
   (let [index-path (str (java.nio.file.Files/createTempDirectory
                           "lucene-clj-typed-"
                           (make-array java.nio.file.attribute.FileAttribute 0)))
-        docs       [{:year 1977 :active true}
-                    {:year 1980 :active false}]
+        docs       [{:year 1977
+                     :rating 4.5
+                     :published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")
+                     :active true}
+                    {:year 1980
+                     :rating 4.2
+                     :published-at (java.time.Instant/parse "1980-08-08T00:00:00Z")
+                     :active false}]
         fields     {:fields {:year   {:type :long}
+                             :rating {:type :double}
+                             :published-at {:type :instant}
                              :active {:type :boolean}}}
         analyzer   (analyzers/keyword-analyzer)]
     (lucene/index! (lucene/create-index! :type :disk
@@ -92,13 +107,20 @@
                                                :path index-path
                                                :analyzer analyzer)]
       (is (= 1 (count (lucene/search reopened-store {:year 1977}))))
+      (is (= 1 (count (lucene/search reopened-store {:rating 4.5}))))
+      (is (= 1 (count (lucene/search reopened-store
+                                     {:published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")}))))
       (is (= 1 (count (lucene/search reopened-store {:active false})))))))
 
 (deftest typed-fields-reject-incompatible-query-values
   (let [analyzer (analyzers/keyword-analyzer)
-        store    (create-store [{:year 1977 :rating 4.5 :active true}]
+        store    (create-store [{:year 1977
+                                 :rating 4.5
+                                 :published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")
+                                 :active true}]
                                {:fields {:year   {:type :long}
                                          :rating {:type :double}
+                                         :published-at {:type :instant}
                                          :active {:type :boolean}}}
                                analyzer)]
     (is (thrown-with-msg?
@@ -113,6 +135,10 @@
           clojure.lang.ExceptionInfo
           #"expected a numeric value for a :double field"
           (lucene/search store {:rating "4.5"})))
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"expected a java.time.Instant or java.util.Date for an :instant field"
+          (lucene/search store {:published-at "1977-02-04T00:00:00Z"})))
     (is (thrown-with-msg?
           clojure.lang.ExceptionInfo
           #"expected true or false for a :boolean field"

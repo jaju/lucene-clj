@@ -345,13 +345,27 @@ The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and sp
 Documents are /Clojure maps/. Each /key-value/ in the map represents one logical field. The second argument to ~index!~ is now a canonical ~:fields~ schema where each field is defined in one place.
 
 The core field options are:
-- ~:type~ - currently ~:text~ or ~:keyword~
+- ~:type~ - currently ~:text~, ~:keyword~, ~:long~, ~:boolean~, ~:double~, or ~:instant~
 - ~:stored?~ - whether the field value is stored and can be returned later
 - ~:indexed?~ - whether the field participates in search
 - ~:multi-valued?~ - whether the field accepts multiple values
 - ~:suggest~ - optional completion settings
   - ~:weight~ adjusts ranking of suggestions
   - ~:contexts-from~ uses one field, several fields, or a function to derive suggestion contexts
+
+Use ~:keyword~ for exact string matching, ~:long~ and ~:double~ for exact numeric matching, ~:boolean~ for true-or-false fields, and ~:instant~ for exact time matching.
+
+Typed fields work naturally with map queries:
+
+#+BEGIN_SRC clojure :tangle no :results none
+{:fields {:rating       {:type :double}
+          :published-at {:type :instant}
+          :active       {:type :boolean}}}
+
+(lucene/search idx {:rating 4.5})
+(lucene/search idx {:published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")})
+(lucene/search idx {:active true})
+#+END_SRC
 
 In the following schema:
 - ~:Year~, ~:Genre~, and ~:Subgenre~ are exact-match /keyword/ fields
@@ -416,7 +430,7 @@ The result includes the /:hit/, a /:score/ for that /:hit/, and the /:doc-id/ wh
 #+end_src
 
 
-For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map. It supports both ~:multi-fields~ and ~:fields-to-keep~ to shape the result. But beyond basic use-cases, supply your own.
+For convenience, /lucene-clj/ has a function that can be used to convert the Lucene /Document/ into a Clojure map. It supports both ~:multi-fields~ and ~:fields-to-keep~ to shape the result. When you use typed stored fields such as ~:boolean~ or ~:instant~, pass ~:field-specs~ so ~document->map~ can decode them back to typed values. But beyond basic use-cases, supply your own.
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/search album-index {:Year "1977"}
                {:results-per-page 2

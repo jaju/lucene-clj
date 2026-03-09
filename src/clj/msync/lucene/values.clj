@@ -1,7 +1,9 @@
 (ns msync.lucene.values
   (:import [clojure.lang Named]
            [java.net URI]
+           [java.time Instant]
            [java.time.temporal TemporalAccessor]
+           [java.util Date]
            [java.util UUID]))
 
 (defn- invalid-text-value!
@@ -70,6 +72,27 @@
 
     :else
     (invalid-text-value! field-name value "expected a numeric value for a :double field")))
+
+(defn -normalize-instant-value
+  "Normalize a temporal value into a java.time.Instant for :instant fields."
+  [field-name value]
+  (cond
+    (nil? value)
+    (invalid-text-value! field-name value "nil values are not indexed or queried")
+
+    (instance? Instant value)
+    value
+
+    (instance? Date value)
+    (.toInstant ^Date value)
+
+    :else
+    (invalid-text-value! field-name value "expected a java.time.Instant or java.util.Date for an :instant field")))
+
+(defn -instant->epoch-millis
+  "Convert an instant value into the epoch-millis representation used by Lucene."
+  [^Instant value]
+  (.toEpochMilli value))
 
 (defn -normalize-boolean-value
   "Normalize a boolean value for :boolean fields."

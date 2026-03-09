@@ -2,7 +2,8 @@
   (:require [msync.lucene.values :as values])
   (:import [org.apache.lucene.document DoubleField Field Field$Store FieldType LongField StoredField StoredValue$Type StringField]
            [org.apache.lucene.index IndexOptions IndexableFieldType Term]
-           [org.apache.lucene.search TermQuery]))
+           [org.apache.lucene.search TermQuery]
+           [java.time Instant]))
 
 (def ^:private indexed-text-options
   IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS)
@@ -77,6 +78,13 @@
       (fn [value]
         (field-factory (str value))))))
 
+(defn- ->instant-field-factory
+  [field-name field-spec]
+  (let [field-factory (->long-field-factory field-name field-spec)]
+    (when field-factory
+      (fn [value]
+        (field-factory (values/-instant->epoch-millis value))))))
+
 (defn- raw-stored-field-value
   [^Field field]
   (let [stored-value (.storedValue field)]
@@ -118,6 +126,12 @@
     (mapv #(values/-normalize-double-value field-name %) raw-value)
     [(values/-normalize-double-value field-name raw-value)]))
 
+(defn- normalize-instant-values
+  [field-name raw-value]
+  (if (multi-valued-input? raw-value)
+    (mapv #(values/-normalize-instant-value field-name %) raw-value)
+    [(values/-normalize-instant-value field-name raw-value)]))
+
 (defn- normalize-boolean-values
   [field-name raw-value]
   (if (multi-valued-input? raw-value)
@@ -130,6 +144,7 @@
                           (:text :keyword) #(values/-normalize-text-values field-name %)
                           :long            #(normalize-long-values field-name %)
                           :double          #(normalize-double-values field-name %)
+                          :instant         #(normalize-instant-values field-name %)
                           :boolean         #(normalize-boolean-values field-name %))]
     (fn [raw-value]
       (ensure-field-cardinality! field-name field-spec raw-value)
@@ -145,6 +160,7 @@
                        :keyword (->exact-string-field-factory field-name field-spec)
                        :long    (->long-field-factory field-name field-spec)
                        :double  (->double-field-factory field-name field-spec)
+                       :instant (->instant-field-factory field-name field-spec)
                        :boolean (->boolean-field-factory field-name field-spec))})
 
 (defn -exact-query
@@ -160,6 +176,9 @@
                                         (values/-normalize-long-value field-name value))
       :double  (DoubleField/newExactQuery (name field-name)
                                           (values/-normalize-double-value field-name value))
+      :instant (LongField/newExactQuery (name field-name)
+                                        (values/-instant->epoch-millis
+                                          (values/-normalize-instant-value field-name value)))
       nil)))
 
 (defn -stored-field-value
@@ -173,4 +192,5 @@
                   "true" true
                   "false" false
                   raw-value)
+       :instant (Instant/ofEpochMilli (long raw-value))
        raw-value))))

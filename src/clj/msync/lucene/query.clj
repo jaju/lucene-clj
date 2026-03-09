@@ -9,7 +9,9 @@
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]
     [org.apache.lucene.queryparser.classic QueryParser]
-    [org.apache.lucene.index Term]))
+    [org.apache.lucene.index Term]
+    [java.time Instant]
+    [java.util Date]))
 
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
@@ -92,6 +94,22 @@
         (typed-query-required! "Boolean query values require a :boolean field definition"
                                {:field-name field-name
                                 :value      boolean-query
+                                :field-spec (field-spec opts)})))
+
+  Instant
+  (parse [instant-query {:keys [field-name] :as opts}]
+    (or (field-types/-exact-query field-name (field-spec opts) instant-query)
+        (typed-query-required! "Instant query values require an :instant field definition"
+                               {:field-name field-name
+                                :value      instant-query
+                                :field-spec (field-spec opts)})))
+
+  Date
+  (parse [date-query {:keys [field-name] :as opts}]
+    (or (field-types/-exact-query field-name (field-spec opts) date-query)
+        (typed-query-required! "Instant query values require an :instant field definition"
+                               {:field-name field-name
+                                :value      date-query
                                 :field-spec (field-spec opts)}))))
 
 (defn ^Query parse-dsl
