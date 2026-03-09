@@ -1,6 +1,7 @@
 (ns msync.lucene.indexer
   (:require [clojure.java.io :as io]
             [msync.lucene
+             [schema :as schema]
              [utils :as utils]
              [validation :as validation]]
             [msync.lucene.document :as d])
@@ -99,8 +100,12 @@
   [^IndexWriter iw
    doc-maps
    indexing-options]
-  (let [doc-maps (validation/-normalize-document-maps doc-maps)
-        doc-fn   (d/-map->document-fn indexing-options)]
+  (let [doc-maps                    (validation/-normalize-document-maps doc-maps)
+        normalized-indexing-options (schema/-normalize-indexing-options indexing-options)
+        doc-fn                      (d/-map->document-fn normalized-indexing-options)]
+    (.setLiveCommitData iw
+                        (schema/-commit-data (.getLiveCommitData iw)
+                                             (:fields normalized-indexing-options)))
     (run! (fn [doc-map]
             (.addDocument iw (doc-fn doc-map)))
           doc-maps)))

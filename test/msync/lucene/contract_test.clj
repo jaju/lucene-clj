@@ -50,12 +50,51 @@
                                  :year   1977
                                  :active true}]
                                {:fields {:title  {:type :keyword}
-                                         :year   {:type :keyword}
-                                         :active {:type :keyword}}}
+                                         :year   {:type :long}
+                                         :active {:type :boolean}}}
                                analyzer)]
     (is (= 1 (count (lucene/search store {:title :rumours}))))
     (is (= 1 (count (lucene/search store {:year 1977}))))
     (is (= 1 (count (lucene/search store {:active true}))))))
+
+(deftest typed-fields-support-exact-queries-after-reopening-an-index
+  (let [index-path (str (java.nio.file.Files/createTempDirectory
+                          "lucene-clj-typed-"
+                          (make-array java.nio.file.attribute.FileAttribute 0)))
+        docs       [{:year 1977 :active true}
+                    {:year 1980 :active false}]
+        fields     {:fields {:year   {:type :long}
+                             :active {:type :boolean}}}
+        analyzer   (analyzers/keyword-analyzer)]
+    (lucene/index! (lucene/create-index! :type :disk
+                                         :path index-path
+                                         :analyzer analyzer)
+                   docs
+                   fields)
+    (let [reopened-store (lucene/create-index! :type :disk
+                                               :path index-path
+                                               :analyzer analyzer)]
+      (is (= 1 (count (lucene/search reopened-store {:year 1977}))))
+      (is (= 1 (count (lucene/search reopened-store {:active false})))))))
+
+(deftest typed-fields-reject-incompatible-query-values
+  (let [analyzer (analyzers/keyword-analyzer)
+        store    (create-store [{:year 1977 :active true}]
+                               {:fields {:year   {:type :long}
+                                         :active {:type :boolean}}}
+                               analyzer)]
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"Numeric query values require a :long field definition"
+          (lucene/search store {:title 1977})))
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"expected an integer value for a :long field"
+          (lucene/search store {:year "1977"})))
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"expected true or false for a :boolean field"
+          (lucene/search store {:active "true"})))))
 
 (deftest suggest-respects-max-results-without-a-hidden-cap
   (let [analyzer (analyzers/keyword-analyzer)

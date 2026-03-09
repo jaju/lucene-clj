@@ -3,7 +3,7 @@
             [msync.lucene.values :as values])
   (:import [org.apache.lucene.index IndexOptions IndexableFieldType]
            [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
-           [org.apache.lucene.document FieldType Field Document]))
+           [org.apache.lucene.document FieldType Field Field$Store Document KeywordField LongField StoredField StoredValue$Type]))
 
 (def suggest-field-prefix "$suggest-")
 
@@ -42,6 +42,47 @@
     (fn [^String value]
       (Field. field-name value field-type))))
 
+(defn- ->store-option
+  [stored?]
+  (if stored?
+    Field$Store/YES
+    Field$Store/NO))
+
+(defn- ->keyword-field-factory
+  [field-name {:keys [indexed? stored?]}]
+  {:pre [(user-field-name? field-name)]}
+  (let [field-name   (name field-name)
+        store-option (->store-option stored?)]
+    (cond
+      indexed?
+      (fn [^String value]
+        (KeywordField. field-name value store-option))
+
+      stored?
+      (fn [^String value]
+        (StoredField. field-name value)))))
+
+(defn- ->long-field-factory
+  [field-name {:keys [indexed? stored?]}]
+  {:pre [(user-field-name? field-name)]}
+  (let [field-name   (name field-name)
+        store-option (->store-option stored?)]
+    (cond
+      indexed?
+      (fn [value]
+        (LongField. field-name (long value) store-option))
+
+      stored?
+      (fn [value]
+        (StoredField. field-name (long value))))))
+
+(defn- ->boolean-field-factory
+  [field-name {:keys [indexed? stored?]}]
+  (let [field-factory (->keyword-field-factory field-name {:indexed? indexed? :stored? stored?})]
+    (when field-factory
+      (fn [value]
+        (field-factory (str value))))))
+
 (defn- ->suggest-field-factory
   "Build a reusable suggestion field constructor for a logical field."
   [field-name weight]
@@ -61,8 +102,22 @@
   (doseq [field-value field-values]
     (.add document (suggest-field-factory field-value contexts))))
 
-(defn- field->kv [^Field f]
-  [(-> f .name keyword) (.stringValue f)])
+(defn- stored-field-value
+  [^Field field]
+  (let [stored-value (.storedValue field)]
+    (if (nil? stored-value)
+      (.stringValue field)
+      (condp = (.getType stored-value)
+        StoredValue$Type/INTEGER (.getIntValue stored-value)
+        StoredValue$Type/LONG (.getLongValue stored-value)
+        StoredValue$Type/FLOAT (.getFloatValue stored-value)
+        StoredValue$Type/DOUBLE (.getDoubleValue stored-value)
+        StoredValue$Type/STRING (.getStringValue stored-value)
+        StoredValue$Type/BINARY (.getBinaryValue stored-value)
+        StoredValue$Type/DATA_INPUT (.getDataInputValue stored-value)))))
+
+(defn- field->kv [^Field field]
+  [(-> field .name keyword) (stored-field-value field)])
 
 (defn vecs->maps
   "Collection of vectors, with the first considered the header.
@@ -99,7 +154,13 @@
                      :field-spec field-spec
                      :value      raw-value})))
   (case type
-    (:text :keyword) (values/-normalize-text-values field-name raw-value)))
+    (:text :keyword) (values/-normalize-text-values field-name raw-value)
+    :long            (if (multi-valued-input? raw-value)
+                       (mapv #(values/-normalize-long-value field-name %) raw-value)
+                       [(values/-normalize-long-value field-name raw-value)])
+    :boolean         (if (multi-valued-input? raw-value)
+                       (mapv #(values/-normalize-boolean-value field-name %) raw-value)
+                       [(values/-normalize-boolean-value field-name raw-value)])))
 
 (defn- compile-contexts-fn
   [context-source]
@@ -128,8 +189,12 @@
 (defn- compile-field-spec
   [field-name {:keys [suggest] :as field-spec}]
   {:field-spec            field-spec
-   :field-factory         (when (or (:indexed? field-spec) (:stored? field-spec))
-                            (->field-factory field-name (field-options field-spec)))
+   :field-factory         (case (:type field-spec)
+                            :text    (when (or (:indexed? field-spec) (:stored? field-spec))
+                                       (->field-factory field-name (field-options field-spec)))
+                            :keyword (->keyword-field-factory field-name field-spec)
+                            :long    (->long-field-factory field-name field-spec)
+                            :boolean (->boolean-field-factory field-name field-spec))
    :suggest-field-factory (when suggest
                             (->suggest-field-factory field-name (:weight suggest)))
    :contexts-fn           (when suggest

@@ -6,6 +6,7 @@
 - The next release line moves to `0.3.0-SNAPSHOT`.
 - Performance work is now tracked with captured benchmark results under `benchmarks/`.
 - Indexing now uses a canonical `:fields` schema where each field is defined in one place.
+- Canonical field specs now support `:long` and `:boolean` with exact-match search.
 
 ### Removed
 - The older bucket-based indexing options:

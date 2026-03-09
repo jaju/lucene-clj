@@ -1,12 +1,17 @@
 (ns msync.lucene.schema
-  (:require [malli.core :as m]
-            [malli.error :as me]))
+  (:require [clojure.edn :as edn]
+            [malli.core :as m]
+            [malli.error :as me])
+  (:import [org.apache.lucene.index DirectoryReader IndexReader]))
+
+(def ^:private field-specs-user-data-key
+  "msync.lucene/field-specs")
 
 (def ^:private removed-indexing-option-keys
   #{:indexed-fields :stored-fields :keyword-fields :suggest-fields :context-fn})
 
 (def ^:private field-type-schema
-  [:enum :text :keyword])
+  [:enum :text :keyword :long :boolean])
 
 (def ^:private context-source-schema
   [:fn
@@ -42,6 +47,22 @@
   [message data]
   (throw (ex-info message data)))
 
+(defn -field-spec
+  "Look up the canonical field spec for a field name."
+  [field-specs field-name]
+  (let [field-key (cond
+                    (keyword? field-name) field-name
+                    (string? field-name) (keyword field-name)
+                    :else field-name)]
+    (get field-specs field-key)))
+
+(defn- searchable-field-specs
+  [field-specs]
+  (into {}
+        (map (fn [[field-name field-spec]]
+               [field-name (select-keys field-spec [:type :indexed? :stored? :multi-valued?])]))
+        field-specs))
+
 (defn- normalize-suggest-spec
   [{:keys [weight contexts-from]
     :or {weight 1}}]
@@ -50,11 +71,17 @@
 
 (defn- normalize-field-spec
   [field-name {:keys [type indexed? stored? multi-valued? suggest]}]
-  (let [normalized-field-spec {:type          type
-                               :indexed?      (if (nil? indexed?) true indexed?)
-                               :stored?       (if (nil? stored?) true stored?)
-                               :multi-valued? (if (nil? multi-valued?) false multi-valued?)
-                               :suggest       (some-> suggest normalize-suggest-spec)}]
+  (let [normalized-field-spec (cond-> {:type          type
+                                       :indexed?      (if (nil? indexed?) true indexed?)
+                                       :stored?       (if (nil? stored?) true stored?)
+                                       :multi-valued? (if (nil? multi-valued?) false multi-valued?)}
+                                suggest
+                                (assoc :suggest (normalize-suggest-spec suggest)))]
+    (when (and suggest
+               (not (#{:text :keyword} type)))
+      (fail! "Only :text and :keyword fields may enable :suggest"
+             {:field-name field-name
+              :field-spec normalized-field-spec}))
     (when-not (or (:indexed? normalized-field-spec)
                   (:stored? normalized-field-spec)
                   (:suggest normalized-field-spec))
@@ -80,3 +107,34 @@
                  (map (fn [[field-name field-spec]]
                         [field-name (normalize-field-spec field-name field-spec)]))
                  fields)})
+
+(defn -serialize-field-specs
+  "Serialize canonical field specs for Lucene commit metadata."
+  [field-specs]
+  (pr-str (searchable-field-specs field-specs)))
+
+(defn -deserialize-field-specs
+  "Deserialize canonical field specs from Lucene commit metadata."
+  [serialized-field-specs]
+  (edn/read-string serialized-field-specs))
+
+(defn -commit-data
+  "Merge canonical field specs into Lucene commit metadata."
+  [existing-commit-data field-specs]
+  (let [commit-data (java.util.HashMap.)]
+    (doseq [[key value] existing-commit-data]
+      (.put commit-data key value))
+    (.put commit-data
+          field-specs-user-data-key
+          (-serialize-field-specs field-specs))
+    (.entrySet commit-data)))
+
+(defn -read-field-specs
+  "Read canonical field specs from a Lucene index reader, if present."
+  [^IndexReader index-reader]
+  (when (instance? DirectoryReader index-reader)
+    (some-> ^DirectoryReader index-reader
+            .getIndexCommit
+            .getUserData
+            (get field-specs-user-data-key)
+            (-deserialize-field-specs))))

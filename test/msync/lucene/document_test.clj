@@ -9,12 +9,12 @@
                                             :active true
                                             :id     identifier}
                                            {:fields {:title  {:type :keyword}
-                                                     :year   {:type :keyword}
-                                                     :active {:type :keyword}
+                                                     :year   {:type :long}
+                                                     :active {:type :boolean}
                                                      :id     {:type :keyword}}})
         hit        (document/document->map doc)]
     (is (= {:title  "rumours"
-            :year   "1977"
+            :year   1977
             :active "true"
             :id     (str identifier)}
            hit))))
@@ -39,3 +39,17 @@
         #"not marked :multi-valued"
         (document/map->document {:tags ["rock" "pop"]}
                                 {:fields {:tags {:type :keyword}}}))))
+
+(deftest map->document-rejects-non-long-values-for-long-fields
+  (is (thrown-with-msg?
+        clojure.lang.ExceptionInfo
+        #"expected an integer value for a :long field"
+        (document/map->document {:year "1977"}
+                                {:fields {:year {:type :long}}}))))
+
+(deftest map->document-rejects-non-boolean-values-for-boolean-fields
+  (is (thrown-with-msg?
+        clojure.lang.ExceptionInfo
+        #"expected true or false for a :boolean field"
+        (document/map->document {:active "true"}
+                                {:fields {:active {:type :boolean}}}))))
