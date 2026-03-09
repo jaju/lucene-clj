@@ -62,6 +62,31 @@
                                  :Subgenre keyword-analyzer}))
 ;; Creating Analyzers:1 ends here
 
+(def album-fields
+  {:Number   {:type :text
+              :stored? true
+              :indexed? true}
+   :Year     {:type :keyword
+              :stored? true
+              :indexed? true}
+   :Album    {:type    :text
+              :stored? true
+              :indexed? true
+              :suggest {:weight 5
+                        :contexts-from :Genre}}
+   :Artist   {:type    :text
+              :stored? true
+              :indexed? true
+              :suggest {:contexts-from :Genre}}
+   :Genre    {:type          :keyword
+              :stored?       true
+              :indexed?      true
+              :multi-valued? true}
+   :Subgenre {:type          :keyword
+              :stored?       true
+              :indexed?      true
+              :multi-valued? true}})
+
 (def suggestion-context-fields
   [:real])
 

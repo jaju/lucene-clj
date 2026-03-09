@@ -21,29 +21,7 @@
    :warmup-jit-period     1000000000})
 
 (def ^:private album-doc-opts
-  {:fields
-   {:Number   {:type :text
-               :stored? true
-               :indexed? true}
-    :Year     {:type :keyword
-               :stored? true
-               :indexed? true}
-    :Album    {:type    :text
-               :stored? true
-               :indexed? true
-               :suggest {:contexts-from :Genre}}
-    :Artist   {:type    :text
-               :stored? true
-               :indexed? true
-               :suggest {:contexts-from :Genre}}
-    :Genre    {:type          :keyword
-               :stored?       true
-               :indexed?      true
-               :multi-valued? true}
-    :Subgenre {:type          :keyword
-               :stored?       true
-               :indexed?      true
-               :multi-valued? true}}})
+  {:fields common/album-fields})
 
 (def ^:private benchmark-docs
   (vec (take benchmark-doc-count (cycle common/album-data))))

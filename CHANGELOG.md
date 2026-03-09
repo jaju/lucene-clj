@@ -5,10 +5,15 @@
 ### Changed
 - The next release line moves to `0.3.0-SNAPSHOT`.
 - Performance work is now tracked with captured benchmark results under `benchmarks/`.
+- Indexing now uses a canonical `:fields` schema where each field is defined in one place.
 
-### Planned Breaking Changes
-- Indexing is moving to a canonical `:fields` schema where each field is defined in one place.
-- The older bucket-based indexing options are being removed rather than carried forward as compatibility baggage.
+### Removed
+- The older bucket-based indexing options:
+  - `:indexed-fields`
+  - `:stored-fields`
+  - `:keyword-fields`
+  - `:suggest-fields`
+  - `:context-fn`
 
 ### Why
 - The old indexing API split one field's meaning across multiple option collections.

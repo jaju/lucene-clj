@@ -109,6 +109,13 @@ Current measured improvements from the first indexing hot-path refactor:
 
 The benchmark harness separates encoder cost from end-to-end indexing cost so hot-path changes can be evaluated more precisely.
 
+The later clean break to the canonical ~:fields~ schema stayed in the same performance range:
+
+- compiled batch encode: ~5.18 ms~ -> ~4.94 ms~
+- batch indexing: ~25.8 ms~ -> ~27.1 ms~
+
+That trade-off is intentional: schema clarity moved up substantially while indexing throughput stayed close to the optimized baseline.
+
 * Usage - A Complete Scenario
 
 There's sample data in the repository that we use in our examples. A hand-created sample with fictional and non-fictional characters is [[file:test-resources/sample-data.csv][here]] and one from Kaggle on music albums is [[file:test-resources/albumlist.csv][here]]. These are also used in the tests.
@@ -335,32 +342,54 @@ The ~Genre~ and ~Subgenre~ columns are pre-processed, as mentioned above, and sp
 
 
 *** Index documents
-Documents are /Clojure maps/. Each /key-value/ in the map represents one ~org.apache.lucene.document.Field~. The options passed to the `index!` function control behavior in various ways
-- ~:indexed-fields~ - Explicitly choose which fields participate in full-text indexing. If omitted, all fields are indexed.
-- ~:stored-fields~ - Lucene can index for efficient searching, but to save space, it need not store all the field values. If you want Lucene to also store the contents, pass them as a collection to this argument.
-- ~:keyword-fields~ - Fields that should be treated verbatim rather than tokenized.
-- ~:suggest-fields~ - Fields that are treated specially during indexing, allowing Lucene to create internal structures for quick prefix matching. This can be a list of field names, or ~[field-name weight]~ pairs.
-- ~:context-fn~ - A keyword or function used to derive a list of contexts for /suggest/ fields, allowing suggestions to be filtered at query time.
+Documents are /Clojure maps/. Each /key-value/ in the map represents one logical field. The second argument to ~index!~ is now a canonical ~:fields~ schema where each field is defined in one place.
 
-In the following, we instruct the `index!` function to 
-- Store the mentioned fields
-- Use the /:Album/ and /:Artist/ fields to index for suggestions - this uses some special processing and storage in the index.
-- Use the /:Genre/ field as context. Note that /:Genre/ is itself can be multiple values for each document, and that works fine.
-#+BEGIN_SRC clojure :tangle dev/dev.clj :results none
-  (lucene/index! album-index common/album-data
-                 {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
-                  :suggest-fields [:Album :Artist]
-                  :context-fn     :Genre})
+The core field options are:
+- ~:type~ - currently ~:text~ or ~:keyword~
+- ~:stored?~ - whether the field value is stored and can be returned later
+- ~:indexed?~ - whether the field participates in search
+- ~:multi-valued?~ - whether the field accepts multiple values
+- ~:suggest~ - optional completion settings
+  - ~:weight~ adjusts ranking of suggestions
+  - ~:contexts-from~ uses one field, several fields, or a function to derive suggestion contexts
+
+In the following schema:
+- ~:Year~, ~:Genre~, and ~:Subgenre~ are exact-match /keyword/ fields
+- ~:Genre~ and ~:Subgenre~ are marked multi-valued
+- ~:Album~ and ~:Artist~ are suggest-enabled
+- ~:Album~ suggestions are given more weight than ~:Artist~
+- suggestion contexts come from the ~:Genre~ field
+
+#+BEGIN_SRC clojure :tangle test/msync/lucene/tests_common.clj :results none
+  (def album-fields
+    {:Number   {:type :text
+                :stored? true
+                :indexed? true}
+     :Year     {:type :keyword
+                :stored? true
+                :indexed? true}
+     :Album    {:type    :text
+                :stored? true
+                :indexed? true
+                :suggest {:weight 5
+                          :contexts-from :Genre}}
+     :Artist   {:type    :text
+                :stored? true
+                :indexed? true
+                :suggest {:contexts-from :Genre}}
+     :Genre    {:type          :keyword
+                :stored?       true
+                :indexed?      true
+                :multi-valued? true}
+     :Subgenre {:type          :keyword
+                :stored?       true
+                :indexed?      true
+                :multi-valued? true}})
 #+END_SRC
 
-Weighted suggestions are also supported:
-#+BEGIN_SRC clojure :tangle no :results none
-(lucene/index! album-index common/album-data
-               {:stored-fields  [:Number :Year :Album :Artist :Genre :Subgenre]
-                :indexed-fields [:Album :Artist :Genre :Subgenre :Year]
-                :keyword-fields [:Year :Genre :Subgenre]
-                :suggest-fields [[:Album 5] :Artist]
-                :context-fn     (fn [doc] (:Genre doc))})
+#+BEGIN_SRC clojure :tangle dev/dev.clj :results none
+  (lucene/index! album-index common/album-data
+                 {:fields common/album-fields})
 #+END_SRC
 
 
@@ -669,8 +698,8 @@ This is an /AND/ operation
 
 Notice that in the /suggest/ function call, the field and suggestion-prefix are *not* passed as a map, as unlike search, suggest calls are only supported over a single field.
 
-**** Suggestions support for fields passed via ~:suggest-fields~
-From above, the fields ~Album~ and ~Artist~ have been marked to be indexed in a way so that we can ask for prefix-based suggestions. During indexing, ~:suggest-fields~ can be a simple field name or a weighted ~[field-name weight]~ pair.
+**** Suggestions for suggest-enabled fields
+From above, the fields ~Album~ and ~Artist~ have a ~:suggest~ entry in their field specs. Suggestion weight and contexts are part of the field definition instead of being spread across separate indexing options.
 
 #+BEGIN_SRC clojure :results output code :tangle dev/dev.clj :exports both
 (lucene/suggest album-index :Album "par"
