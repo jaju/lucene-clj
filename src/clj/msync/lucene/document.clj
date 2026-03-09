@@ -3,7 +3,7 @@
             [msync.lucene.values :as values])
   (:import [org.apache.lucene.index IndexOptions IndexableFieldType]
            [org.apache.lucene.search.suggest.document SuggestField ContextSuggestField]
-           [org.apache.lucene.document FieldType Field Field$Store Document KeywordField LongField StoredField StoredValue$Type]))
+           [org.apache.lucene.document FieldType Field Field$Store Document StringField LongField StoredField StoredValue$Type]))
 
 (def suggest-field-prefix "$suggest-")
 
@@ -48,7 +48,7 @@
     Field$Store/YES
     Field$Store/NO))
 
-(defn- ->keyword-field-factory
+(defn- ->exact-string-field-factory
   [field-name {:keys [indexed? stored?]}]
   {:pre [(user-field-name? field-name)]}
   (let [field-name   (name field-name)
@@ -56,7 +56,7 @@
     (cond
       indexed?
       (fn [^String value]
-        (KeywordField. field-name value store-option))
+        (StringField. field-name value store-option))
 
       stored?
       (fn [^String value]
@@ -78,7 +78,7 @@
 
 (defn- ->boolean-field-factory
   [field-name {:keys [indexed? stored?]}]
-  (let [field-factory (->keyword-field-factory field-name {:indexed? indexed? :stored? stored?})]
+  (let [field-factory (->exact-string-field-factory field-name {:indexed? indexed? :stored? stored?})]
     (when field-factory
       (fn [value]
         (field-factory (str value))))))
@@ -145,22 +145,40 @@
        (not (string? value))
        (not (map? value))))
 
-(defn- normalize-field-values
-  [field-name {:keys [type multi-valued?] :as field-spec} raw-value]
+(defn- ensure-field-cardinality!
+  [field-name {:keys [multi-valued?] :as field-spec} raw-value]
   (when (and (multi-valued-input? raw-value)
              (not multi-valued?))
     (throw (ex-info "Field value is multi-valued, but the field is not marked :multi-valued?"
                     {:field-name field-name
                      :field-spec field-spec
-                     :value      raw-value})))
-  (case type
-    (:text :keyword) (values/-normalize-text-values field-name raw-value)
-    :long            (if (multi-valued-input? raw-value)
-                       (mapv #(values/-normalize-long-value field-name %) raw-value)
-                       [(values/-normalize-long-value field-name raw-value)])
-    :boolean         (if (multi-valued-input? raw-value)
-                       (mapv #(values/-normalize-boolean-value field-name %) raw-value)
-                       [(values/-normalize-boolean-value field-name raw-value)])))
+                     :value      raw-value}))))
+
+(defn- normalize-long-values
+  [field-name raw-value]
+  (if (multi-valued-input? raw-value)
+    (mapv #(values/-normalize-long-value field-name %) raw-value)
+    [(values/-normalize-long-value field-name raw-value)]))
+
+(defn- normalize-boolean-values
+  [field-name raw-value]
+  (if (multi-valued-input? raw-value)
+    (mapv #(values/-normalize-boolean-value field-name %) raw-value)
+    [(values/-normalize-boolean-value field-name raw-value)]))
+
+(defn- compile-value-normalizer
+  [field-name {:keys [type] :as field-spec}]
+  (let [base-normalizer (case type
+                          (:text :keyword) #(values/-normalize-text-values field-name %)
+                          :long            #(normalize-long-values field-name %)
+                          :boolean         #(normalize-boolean-values field-name %))]
+    (fn [raw-value]
+      (ensure-field-cardinality! field-name field-spec raw-value)
+      (base-normalizer raw-value))))
+
+(defn- normalize-field-values
+  [normalize-values raw-value]
+  (normalize-values raw-value))
 
 (defn- compile-contexts-fn
   [context-source]
@@ -189,10 +207,11 @@
 (defn- compile-field-spec
   [field-name {:keys [suggest] :as field-spec}]
   {:field-spec            field-spec
+   :normalize-values      (compile-value-normalizer field-name field-spec)
    :field-factory         (case (:type field-spec)
                             :text    (when (or (:indexed? field-spec) (:stored? field-spec))
                                        (->field-factory field-name (field-options field-spec)))
-                            :keyword (->keyword-field-factory field-name field-spec)
+                            :keyword (->exact-string-field-factory field-name field-spec)
                             :long    (->long-field-factory field-name field-spec)
                             :boolean (->boolean-field-factory field-name field-spec))
    :suggest-field-factory (when suggest
@@ -221,10 +240,10 @@
   [doc-map {:keys [field-encoders]}]
   (let [doc (Document.)]
     (doseq [[field-name raw-value] doc-map]
-      (let [{:keys [field-spec field-factory suggest-field-factory contexts-fn]}
+      (let [{:keys [normalize-values field-factory suggest-field-factory contexts-fn]}
             (or (get field-encoders field-name)
                 (unknown-field! field-name field-encoders))
-            field-values (normalize-field-values field-name field-spec raw-value)]
+            field-values (normalize-field-values normalize-values raw-value)]
         (when field-factory
           (add-fields! doc field-values field-factory))
         (when suggest-field-factory

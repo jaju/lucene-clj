@@ -3,13 +3,13 @@
              [schema :as schema]
              [values :as values]])
   (:import
-    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur FuzzyQuery]
+    [org.apache.lucene.search Query BooleanQuery$Builder BooleanClause$Occur FuzzyQuery TermQuery]
     [clojure.lang Named Sequential IPersistentSet IPersistentMap IMapEntry]
     [org.apache.lucene.util QueryBuilder]
     [org.apache.lucene.analysis Analyzer]
     [org.apache.lucene.queryparser.classic QueryParser]
     [org.apache.lucene.index Term]
-    [org.apache.lucene.document KeywordField LongField]))
+    [org.apache.lucene.document LongField]))
 
 ;; Unabashedly based on https://github.com/federkasten/clucie/blob/master/src/clucie/query.clj
 
@@ -24,10 +24,10 @@
   [field-name field-spec value]
   (case (:type field-spec)
     :text    nil
-    :keyword (KeywordField/newExactQuery (name field-name)
-                                         (values/-normalize-text-value field-name value))
-    :boolean (KeywordField/newExactQuery (name field-name)
-                                         (str (values/-normalize-boolean-value field-name value)))
+    :keyword (TermQuery. (Term. (name field-name)
+                                (values/-normalize-text-value field-name value)))
+    :boolean (TermQuery. (Term. (name field-name)
+                                (str (values/-normalize-boolean-value field-name value))))
     :long    (LongField/newExactQuery (name field-name)
                                       (values/-normalize-long-value field-name value))
     nil      nil
