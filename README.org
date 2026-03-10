@@ -109,6 +109,9 @@ Current measured improvements from the first indexing hot-path refactor:
 
 The benchmark harness separates encoder cost from end-to-end indexing cost so hot-path changes can be evaluated more precisely.
 
+Recent benchmark captures use the same directory strategy as /lucene-clj/'s ~:memory~ indexes.
+Older captures that used a different Lucene directory implementation are useful historically, but not directly comparable to the current ones.
+
 The later clean break to the canonical ~:fields~ schema stayed in the same performance range:
 
 - compiled batch encode: ~5.18 ms~ -> ~4.94 ms~

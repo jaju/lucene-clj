@@ -7,8 +7,7 @@
             [msync.lucene.document :as document]
             [msync.lucene.indexer :as indexer]
             [msync.lucene.tests-common :as common])
-  (:import [java.time Instant]
-           [org.apache.lucene.store ByteBuffersDirectory]))
+  (:import [java.time Instant]))
 
 (def ^:private criterium-version "0.5.153-ALPHA")
 
@@ -59,11 +58,12 @@
      :elapsed-time (summarize-elapsed-time bench-data)}))
 
 (defn- create-writer
-  "Create a fresh in-memory writer for indexing benchmarks."
+  "Create a fresh writer using the same directory strategy as lucene-clj's :memory indexes."
   []
-  (let [directory (ByteBuffersDirectory.)
+  (let [{:keys [directory analyzer]} (indexer/create! {:type :memory
+                                                       :analyzer common/album-data-analyzer})
         writer    (indexer/index-writer directory
-                                        (indexer/index-writer-config common/album-data-analyzer))]
+                                        (indexer/index-writer-config analyzer))]
     {:directory directory
      :writer    writer}))
 

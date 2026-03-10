@@ -1,7 +1,6 @@
 (ns msync.lucene.suggestions
   (:require [msync.lucene.document :as d]
             [msync.lucene
-             [session :as session]
              [validation :as validation]
              [values :as values]])
   (:import [org.apache.lucene.search ScoreDoc]

@@ -6,7 +6,7 @@
            [java.time Instant]))
 
 (def ^:private indexed-text-options
-  IndexOptions/DOCS_AND_FREQS_AND_POSITIONS_AND_OFFSETS)
+  IndexOptions/DOCS_AND_FREQS_AND_POSITIONS)
 
 (defn- ->store-option
   [stored?]

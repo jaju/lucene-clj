@@ -1,7 +1,6 @@
 (ns msync.lucene.search
   (:require [msync.lucene
              [query :as query]
-             [session :as session]
              [validation :as validation]])
   (:import [org.apache.lucene.search ScoreDoc TopDocs Query IndexSearcher]
            [msync.lucene.session SearchSession]))

@@ -3,21 +3,28 @@
   (:import [org.apache.lucene.util BytesRef]
            [java.nio.file Files]
            [java.nio.file.attribute FileAttribute]
-           [org.apache.lucene.store FSDirectory]))
+           [org.apache.lucene.store AlreadyClosedException FSDirectory]))
 
-(defn- lucene-dir-deleter [^FSDirectory directory]
-  (doseq [^String f (.listAll directory)]
-    (.deleteFile directory f))
-  (Files/delete (.getDirectory directory)))
+(defn- lucene-dir-deleter
+  [directory-path]
+  (when (Files/exists directory-path (make-array java.nio.file.LinkOption 0))
+    (with-open [directory (FSDirectory/open directory-path)]
+      (doseq [^String f (.listAll directory)]
+        (.deleteFile directory f)))
+    (Files/deleteIfExists directory-path)))
 
 (defonce ^:private deletable-directory-list (atom #{}))
 
-(defn delete-on-exit! [d]
-  (swap! deletable-directory-list conj d))
+(defn delete-on-exit!
+  [^FSDirectory directory]
+  (swap! deletable-directory-list conj (.getDirectory directory)))
 
 (defn- delete-marked-lucene-directories! []
-  (doseq [d @deletable-directory-list]
-    (lucene-dir-deleter d))
+  (doseq [directory-path @deletable-directory-list]
+    (try
+      (lucene-dir-deleter directory-path)
+      (catch AlreadyClosedException _
+        nil)))
   (reset! deletable-directory-list #{}))
 
 (.addShutdownHook (Runtime/getRuntime)
