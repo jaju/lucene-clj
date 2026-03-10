@@ -1,10 +1,12 @@
 (ns msync.lucene
   (:require [msync.lucene
              [search :as search]
+             [session :as session]
              [suggestions :as suggestions]
              [indexer :as indexer]])
   (:import [java.util.logging Logger]
-           [msync.lucene.indexer IndexConfig]))
+           [msync.lucene.indexer IndexConfig]
+           [msync.lucene.session SearchSession]))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (do
@@ -21,21 +23,47 @@
   [store doc-maps indexing-options]
   (indexer/index! store doc-maps indexing-options))
 
+(defn ^SearchSession open-session
+  "Open a reusable Lucene search session.
+  Use with-open to keep a stable reader/searcher snapshot across multiple search or suggest calls."
+  [^IndexConfig index-config]
+  (session/-open-search-session index-config))
+
 (defn search
   "Search an index using lucene-clj query shapes or a raw Lucene Query."
-  ([^IndexConfig index-config query-form]
-   (search index-config query-form {}))
-  ([^IndexConfig index-config query-form opts]
-   (let [{:keys [directory analyzer]} index-config
-         opts (assoc opts :analyzer analyzer)]
-     (with-open [reader (indexer/index-reader directory)]
-       (search/search reader query-form opts)))))
+  ([search-target query-form]
+   (search search-target query-form {}))
+  ([search-target query-form opts]
+   (cond
+     (instance? SearchSession search-target)
+     (search/search search-target query-form
+                    (assoc (or opts {}) :analyzer (:analyzer search-target)))
+
+     (instance? IndexConfig search-target)
+     (with-open [search-session (open-session search-target)]
+       (search/search search-session query-form
+                      (assoc (or opts {}) :analyzer (:analyzer search-target))))
+
+     :else
+     (throw (ex-info "search requires an IndexConfig or SearchSession"
+                     {:search-target       search-target
+                      :search-target-class (some-> search-target class str)})))))
 
 (defn suggest
   "Return completion suggestions for a suggest-enabled field."
-  [^IndexConfig index-config field-name ^String prefix-query & [opts]]
-  (let [{:keys [directory analyzer]} index-config
-        opts (assoc (or opts {}) :analyzer analyzer)]
-    (with-open [index-reader (indexer/index-reader directory)]
-      (suggestions/suggest index-reader (name field-name) prefix-query opts))))
+  [search-target field-name ^String prefix-query & [opts]]
+  (cond
+    (instance? SearchSession search-target)
+    (suggestions/suggest search-target (name field-name) prefix-query
+                         (assoc (or opts {}) :analyzer (:analyzer search-target)))
+
+    (instance? IndexConfig search-target)
+    (with-open [search-session (open-session search-target)]
+      (suggestions/suggest search-session (name field-name) prefix-query
+                           (assoc (or opts {}) :analyzer (:analyzer search-target))))
+
+    :else
+    (throw (ex-info "suggest requires an IndexConfig or SearchSession"
+                    {:search-target       search-target
+                     :search-target-class (some-> search-target class str)}))))
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

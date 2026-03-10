@@ -535,6 +535,28 @@ The same projection can be expressed with ~ld/document->map~ directly by using ~
                 :hit->doc #(ld/document->map % :fields-to-keep #{:Year :Album})})
 #+END_SRC
 
+For one-off calls, the ~:page~ option is still convenient.
+For stable pagination across repeated calls, prefer a reusable search session plus ~:search-after~.
+The continuation token can simply be the last result map from the previous page, since it already carries ~:doc-id~ and ~:score~.
+
+#+BEGIN_SRC clojure :tangle no :results none
+(with-open [session (lucene/open-session album-index)]
+  (let [page-0 (lucene/search session
+                              {:Year "1968"}
+                              {:results-per-page 5
+                               :hit->doc #(ld/document->map % :fields-to-keep #{:Year :Album})})
+        page-1 (lucene/search session
+                              {:Year "1968"}
+                              {:results-per-page 5
+                               :search-after (last page-0)
+                               :hit->doc #(ld/document->map % :fields-to-keep #{:Year :Album})})]
+    [page-0 page-1]))
+#+END_SRC
+
+The session pins a single Lucene reader snapshot.
+That means repeated ~search~ and ~suggest~ calls within the same ~with-open~ block see a stable view of the index.
+If the index changes and you open a new session, result ordering and pagination boundaries may change accordingly.
+
 
 *** Search variations
 

@@ -42,7 +42,13 @@
     (is (thrown-with-msg?
           clojure.lang.ExceptionInfo
           #"requires :page to be a natural integer"
-          (lucene/search store {:first-name "Oliver"} {:page -1})))))
+          (lucene/search store {:first-name "Oliver"} {:page -1})))
+    (is (thrown-with-msg?
+          clojure.lang.ExceptionInfo
+          #"requires either :page or :search-after"
+          (lucene/search store {:first-name "Oliver"}
+                         {:page 1
+                          :search-after {:doc-id 1 :score 1.0}})))))
 
 (deftest scalar-values-are-searchable-after-normalization
   (let [published-at (java.time.Instant/parse "1977-02-04T00:00:00Z")
@@ -143,6 +149,12 @@
           clojure.lang.ExceptionInfo
           #"expected true or false for a :boolean field"
           (lucene/search store {:active "true"})))))
+
+(deftest search-session-supports-reused-search-and-suggest-calls
+  (let [store (common/create-sample-store)]
+    (with-open [search-session (lucene/open-session store)]
+      (is (= 1 (count (lucene/search search-session {:last-name "Jupiterwala"}))))
+      (is (= 2 (count (lucene/suggest search-session :first-name "Cha" {:max-results 2})))))))
 
 (deftest suggest-respects-max-results-without-a-hidden-cap
   (let [analyzer (analyzers/keyword-analyzer)

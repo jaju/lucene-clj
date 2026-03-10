@@ -1,6 +1,6 @@
 (ns msync.lucene.validation
   (:require [clojure.string :as string])
-  (:import [org.apache.lucene.search Query]))
+  (:import [org.apache.lucene.search Query ScoreDoc]))
 
 (defn- fail!
   [message data]
@@ -45,7 +45,7 @@
 
 (defn -validate-search-opts
   "Validate search options against the public query-form contract."
-  [query-form {:keys [field-name fuzzy? results-per-page page] :as opts}]
+  [query-form {:keys [field-name fuzzy? results-per-page page search-after] :as opts}]
   (when (and (query-form-requires-field-name? query-form)
              (nil? field-name))
     (fail! "search requires :field-name when the top-level query form is not a field-to-value map"
@@ -58,6 +58,16 @@
            {:query-form query-form :opts opts}))
   (when-not (nat-int? page)
     (fail! "search requires :page to be a natural integer"
+           {:query-form query-form :opts opts}))
+  (when (and search-after (pos? page))
+    (fail! "search requires either :page or :search-after, but not both"
+           {:query-form query-form :opts opts}))
+  (when (and search-after
+             (not (or (instance? ScoreDoc search-after)
+                      (and (map? search-after)
+                           (integer? (:doc-id search-after))
+                           (number? (:score search-after))))))
+    (fail! "search requires :search-after to be a ScoreDoc or a map with :doc-id and :score"
            {:query-form query-form :opts opts}))
   opts)
 

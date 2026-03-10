@@ -147,6 +147,25 @@
       (testing "All pages have non-overlapping documents"
         (is (= 6 (count (into #{} (map :doc-id (flatten [page-0 page-1 page-2])))))))))
 
+  (deftest search-after-results
+    (with-open [search-session (lucene/open-session store)]
+      (let [query  {:bio #{"love" "enjoy"}}
+            page-0 (lucene/search search-session query {:results-per-page 2
+                                                        :hit->doc document/document->map})
+            page-1 (lucene/search search-session query {:results-per-page 2
+                                                        :search-after (last page-0)
+                                                        :hit->doc document/document->map})
+            page-2 (lucene/search search-session query {:results-per-page 2
+                                                        :search-after (last page-1)
+                                                        :hit->doc document/document->map})]
+        (testing "search-after returns the next page on the same reader snapshot"
+          (is (= 2 (count page-0)))
+          (is (= 2 (count page-1)))
+          (is (= 2 (count page-2))))
+
+        (testing "search-after pages do not overlap"
+          (is (= 6 (count (into #{} (map :doc-id (flatten [page-0 page-1 page-2]))))))))))
+
   (deftest suggestions-with-limit-params
     (let [query    "S"
           result-1 (suggest-results store :first-name query {:max-results 2})
